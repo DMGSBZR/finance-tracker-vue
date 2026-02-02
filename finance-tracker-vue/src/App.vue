@@ -64,27 +64,78 @@ const visibleTransactions = computed(() => {
   return list;
 });
 
-// dados fake temporários (só pra ver render)
-if (transactions.value.length === 0) {
-  transactions.value.push(
-    {
-      id: "1",
-      type: "income",
-      date: "2026-02-01",
-      category: "Salário",
-      description: "Empresa",
-      amount: 3000,
-    },
-    {
-      id: "2",
-      type: "expense",
-      date: "2026-02-02",
-      category: "Mercado",
-      description: "Compra do mês",
-      amount: 450,
+    const form = ref({
+      type: '',
+      amount: '',
+      date: '',
+      category: '',
+      description: ''
+    });
+
+    const editingId = ref(null);
+    const errors = ref({});
+
+    function validateForm() {
+      const e = {};
+
+      if(!form.value.type) e.type = "Selecione o tipo";
+      if(!form.value.amount || Number(form.value.amount) <= 0) e.amount = "Informe um valor válido";
+      if(!form.value.date) e.date = "Informe a data";
+      if(!form.value.category.trim()) e.category = "Informe a categoria";
+
+      errors.value = e;
+      return Object.keys(e).length === 0;
     }
-  );
+
+function submitForm() {
+  if (!validateForm()) return;
+
+  const tx = {
+    id: editingId.value ?? crypto.randomUUID(),
+    type: form.value.type,
+    amount: Number(form.value.amount),
+    date: form.value.date,
+    category: form.value.category.trim(),
+    description: form.value.description.trim(),
+  };
+
+  if (editingId.value) {
+    const index = transactions.value.findIndex((t) => t.id === editingId.value);
+    if (index !== -1) {
+      transactions.value[index] = tx;
+    }
+    editingId.value = null;
+  } else {
+    transactions.value.push(tx);
+  }
+
+  resetForm();
 }
+function resetForm() {
+  form.value = {
+    type: "",
+    amount: "",
+    date: "",
+    category: "",
+    description: "",
+  };
+  errors.value = {};
+}
+function editTransaction(tx) {
+  editingId.value = tx.id;
+  form.value = {
+    type: tx.type,
+    amount: tx.amount,
+    date: tx.date,
+    category: tx.category,
+    description: tx.description,
+  };
+}
+
+function deleteTransaction(id) {
+  transactions.value = transactions.value.filter((t) => t.id !== id);
+}
+
 </script>
 
 <template>
@@ -107,56 +158,53 @@ if (transactions.value.length === 0) {
 
         <div id="feedback" class="feedback" aria-live="polite" aria-atomic="true"></div>
 
-        <form>
-          <div class="field">
-            <label for="type">Tipo</label>
-            <select id="type" name="type">
-              <option value="">Selecione</option>
-              <option value="income">Receita</option>
-              <option value="expense">Despesa</option>
-            </select>
-            <small id="type-error" class="field-error" aria-live="polite"></small>
-          </div>
+        <form @submit.prevent="submitForm">
 
-          <div class="field">
-            <label for="amount">Valor</label>
-            <input type="number" id="amount" name="amount" min="0.01" step="0.01" />
-            <small id="amount-error" class="field-error" aria-live="polite"></small>
-          </div>
+  <div class="field">
+    <label>Tipo</label>
+    <select v-model="form.type">
+      <option value="">Selecione</option>
+      <option value="income">Receita</option>
+      <option value="expense">Despesa</option>
+    </select>
+    <small class="field-error">{{ errors.type }}</small>
+  </div>
 
-          <div class="field">
-            <label for="date">Data</label>
-            <input type="date" id="date" name="date" />
-            <small id="date-error" class="field-error" aria-live="polite"></small>
-          </div>
+  <div class="field">
+    <label>Valor</label>
+    <input type="number" v-model="form.amount" />
+    <small class="field-error">{{ errors.amount }}</small>
+  </div>
 
-          <div class="field">
-            <label for="category">Categoria</label>
-            <input
-              type="text"
-              id="category"
-              name="category"
-              placeholder="Ex: Mercado, Salário"
-              autocomplete="off"
-            />
-            <small id="category-error" class="field-error" aria-live="polite"></small>
-          </div>
+  <div class="field">
+    <label>Data</label>
+    <input type="date" v-model="form.date" />
+    <small class="field-error">{{ errors.date }}</small>
+  </div>
 
-          <div class="field">
-            <label for="description">Descrição (opcional)</label>
-            <input
-              type="text"
-              id="description"
-              name="description"
-              placeholder="Ex: compra do mês"
-              autocomplete="off"
-            />
-            <small id="description-error" class="field-error" aria-live="polite"></small>
-          </div>
+  <div class="field">
+    <label>Categoria</label>
+    <input type="text" v-model="form.category" />
+    <small class="field-error">{{ errors.category }}</small>
+  </div>
 
-          <button type="submit">Adicionar</button>
-          <button type="button" id="cancel-edit" hidden>Cancelar Edição</button>
-        </form>
+  <div class="field">
+    <label>Descrição</label>
+    <input type="text" v-model="form.description" />
+  </div>
+
+  <button type="submit">
+    {{ editingId ? "Salvar" : "Adicionar" }}
+  </button>
+
+  <button
+    type="button"
+    v-if="editingId"
+    @click="() => { editingId = null; resetForm(); }"
+  >
+    Cancelar Edição
+  </button>
+</form>
       </section>
 
       <section class="filters" aria-label="Filtros de transações">
@@ -210,8 +258,9 @@ if (transactions.value.length === 0) {
     <td>{{ tx.description }}</td>
     <td>R$ {{ tx.amount.toFixed(2) }}</td>
     <td>
-      <button>Editar</button>
-      <button>Excluir</button>
+      <button type="button @click="editTransaction(tx)>editar</button>
+      <button type="button @click="deleteTransaction(tx.id)>Excluir</button>
+      
     </td>
   </tr>
 </tbody>
