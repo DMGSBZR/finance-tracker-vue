@@ -1,3 +1,92 @@
+<script setup>
+import { ref, watch, computed } from 'vue';
+
+const STORAGE_KEY = 'finance-tracker-transactions';
+const transactions = ref([]);
+
+function loadTransactions() {
+ const raw = localStorage.getItem(STORAGE_KEY);
+ if (!raw) return [];
+
+ try { 
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+ }catch {
+    return [];
+ }
+} 
+
+transactions.value = loadTransactions();
+    
+watch(
+  transactions,
+  (newValue) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newValue));
+  },
+  { deep: true }
+);
+
+const filterType = ref('all');
+const searchText = ref('');
+const sortBy = ref('date-desc');
+
+const visibleTransactions = computed(() => {
+  let list = [...transactions.value];
+
+  if (filterType.value !== "all") {
+    list = list.filter((tx) => tx.type === filterType.value);
+  }
+
+  const query = searchText.value.trim().toLowerCase();
+  if (query) {
+    list = list.filter(
+      (tx) =>
+        tx.category.toLowerCase().includes(query) ||
+        (tx.description || "").toLowerCase().includes(query)
+    );
+  }
+
+  switch (sortBy.value) {
+    case "date-asc":
+      list.sort((a, b) => a.date.localeCompare(b.date));
+      break;
+    case "date-desc":
+      list.sort((a, b) => b.date.localeCompare(a.date));
+      break;
+    case "amount-asc":
+      list.sort((a, b) => a.amount - b.amount);
+      break;
+    case "amount-desc":
+      list.sort((a, b) => b.amount - a.amount);
+      break;
+  }
+
+  return list;
+});
+
+// dados fake temporários (só pra ver render)
+if (transactions.value.length === 0) {
+  transactions.value.push(
+    {
+      id: "1",
+      type: "income",
+      date: "2026-02-01",
+      category: "Salário",
+      description: "Empresa",
+      amount: 3000,
+    },
+    {
+      id: "2",
+      type: "expense",
+      date: "2026-02-02",
+      category: "Mercado",
+      description: "Compra do mês",
+      amount: 450,
+    }
+  );
+}
+</script>
+
 <template>
   <div>
     <header class="container">
@@ -71,25 +160,29 @@
       </section>
 
       <section class="filters" aria-label="Filtros de transações">
-        <select id="filter-type">
-          <option value="all">Todas</option>
-          <option value="income">Receitas</option>
-          <option value="expense">Despesas</option>
-        </select>
+  <select v-model="filterType">
+    <option value="all">Todas</option>
+    <option value="income">Receitas</option>
+    <option value="expense">Despesas</option>
+  </select>
 
-        <input type="text" id="search-text" placeholder="Buscar por categoria ou descrição" />
+  <input
+    type="text"
+    placeholder="Buscar por categoria ou descrição"
+    v-model="searchText"
+  />
 
-        <button id="clear-filters" type="button" class="btn btn-secondary" disabled>
-          Limpar
-        </button>
+  <button type="button" class="btn btn-secondary" disabled>
+    Limpar
+  </button>
 
-        <select id="sort-by">
-          <option value="date-desc">Data (mais recente)</option>
-          <option value="date-asc">Data (mais antiga)</option>
-          <option value="amount-desc">Valor (maior)</option>
-          <option value="amount-asc">Valor (menor)</option>
-        </select>
-      </section>
+  <select v-model="sortBy">
+    <option value="date-desc">Data (mais recente)</option>
+    <option value="date-asc">Data (mais antiga)</option>
+    <option value="amount-desc">Valor (maior)</option>
+    <option value="amount-asc">Valor (menor)</option>
+  </select>
+</section>
 
       <section>
         <h2>Transações</h2>
@@ -109,7 +202,19 @@
               </tr>
             </thead>
 
-            <tbody id="transactions-body"></tbody>
+            <tbody>
+  <tr v-for="tx in visibleTransactions" :key="tx.id">
+    <td>{{ tx.date }}</td>
+    <td>{{ tx.type === "income" ? "Receita" : "Despesa" }}</td>
+    <td>{{ tx.category }}</td>
+    <td>{{ tx.description }}</td>
+    <td>R$ {{ tx.amount.toFixed(2) }}</td>
+    <td>
+      <button>Editar</button>
+      <button>Excluir</button>
+    </td>
+  </tr>
+</tbody>
           </table>
         </div>
       </section>
