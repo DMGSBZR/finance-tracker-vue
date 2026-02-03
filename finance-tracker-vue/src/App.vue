@@ -1,45 +1,19 @@
 <script setup>
-import { ref, watch, computed} from 'vue';
+
+import { ref, computed} from 'vue';
 import SummaryCards from './components/SummaryCards.vue';
 import FiltersBar from './components/FiltersBar.vue';
 import TransactionsTable from './components/TransactionsTable.vue';
 import TransactionForm from './components/TransactionForm.vue';
+import { useLocalStorage } from './composables/useLocalStorage.js';
+import {useTransactions } from './composables/useTransactions.js';
 
 const STORAGE_KEY = 'finance-tracker-transactions';
-const transactions = ref([]);
+const transactions = useLocalStorage(STORAGE_KEY, []);
 
-function formatBrl(value) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
-
-function loadTransactions() {
- const raw = localStorage.getItem(STORAGE_KEY);
- if (!raw) return [];
-
- try { 
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
- }catch {
-    return [];
- }
-} 
-
-transactions.value = loadTransactions();
-    
-watch(
-  transactions,
-  (newValue) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newValue));
-  },
-  { deep: true }
-);
-
-const filterType = ref('all');
-const searchText = ref('');
-const sortBy = ref('date-desc');
+const filterType = ref("all");
+const searchText = ref("");
+const sortBy = ref("date-desc");
 
 const visibleTransactions = computed(() => {
   let list = [...transactions.value];
@@ -74,9 +48,20 @@ const visibleTransactions = computed(() => {
 
   return list;
 });
+
 // =====================
 // Resumo financeiro
 // =====================
+
+
+// Formatação de moeda BRL
+function formatBrl(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
 const incomeTotal = computed(() => {
   return visibleTransactions.value
     .filter((tx) => tx.type === "income")
@@ -115,90 +100,7 @@ function clearFilters() {
   sortBy.value = "date-desc";
 }
 
-
-
-    const form = ref({
-      type: '',
-      amount: '',
-      date: '',
-      category: '',
-      description: ''
-    });
-
-    const editingId = ref(null);
-    const errors = ref({});
-
-    function validateForm() {
-      const e = {};
-
-      if(!form.value.type) e.type = "Selecione o tipo";
-      if(!form.value.amount || Number(form.value.amount) <= 0) e.amount = "Informe um valor válido";
-      if(!form.value.date) e.date = "Informe a data";
-      if(!form.value.category.trim()) e.category = "Informe a categoria";
-
-      errors.value = e;
-      return Object.keys(e).length === 0;
-    }
-
-function submitForm() {
-  if (!validateForm()) return;
-
-  const tx = {
-    id: editingId.value ?? crypto.randomUUID(),
-    type: form.value.type,
-    amount: Number(form.value.amount),
-    date: form.value.date,
-    category: form.value.category.trim(),
-    description: form.value.description.trim(),
-  };
-
-  if (editingId.value) {
-    const index = transactions.value.findIndex((t) => t.id === editingId.value);
-    if (index !== -1) {
-      transactions.value[index] = tx;
-    }
-    editingId.value = null;
-  } else {
-    transactions.value.push(tx);
-  }
-
-  resetForm();
-}
-function resetForm() {
-  form.value = {
-    type: "",
-    amount: "",
-    date: "",
-    category: "",
-    description: "",
-  };
-  errors.value = {};
-}
-function editTransaction(tx) {
-  editingId.value = tx.id;
-
-  form.value = {
-    type: tx.type,
-    amount: tx.amount,
-    date: tx.date,
-    category: tx.category,
-    description: tx.description,
-  };
-}
-
-function cancelEdit() {
-  editingId.value = null;
-  resetForm();
-}
-
-  // Espera o DOM atualizar e então foca o campo
-  await nextTick();{
-  amountInputRef.value?.focus();
-}
-
-function deleteTransaction(id) {
-  transactions.value = transactions.value.filter((t) => t.id !== id);
-}
+const { form, errors, editingId, submitForm, cancelEdit, editTransaction, deleteTransaction } = useTransactions(transactions);
 
 </script>
 
