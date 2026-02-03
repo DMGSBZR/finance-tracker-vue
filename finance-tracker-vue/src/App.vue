@@ -45,6 +45,26 @@ const visibleTransactions = computed(() => {
         (tx.description || "").toLowerCase().includes(query)
     );
   }
+  const incomeTotal = computed(() => {
+  return visibleTransactions.value
+    .filter((tx) => tx.type === "income")
+    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+});
+
+const expenseTotal = computed(() => {
+  return visibleTransactions.value
+    .filter((tx) => tx.type === "expense")
+    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+});
+
+const balanceTotal = computed(() => incomeTotal.value - expenseTotal.value);
+
+function formatBRL(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
 
   switch (sortBy.value) {
     case "date-asc":
@@ -147,11 +167,11 @@ function deleteTransaction(id) {
 
     <main class="container">
       <section>
-        <h2>Resumo</h2>
-        <p>Receitas: <strong>R$ 0,00</strong></p>
-        <p>Despesas: <strong>R$ 0,00</strong></p>
-        <p>Saldo: <strong>R$ 0,00</strong></p>
-      </section>
+  <h2>Resumo</h2>
+  <p>Receitas: <strong>{{ formatBRL(incomeTotal) }}</strong></p>
+  <p>Despesas: <strong>{{ formatBRL(expenseTotal) }}</strong></p>
+  <p>Saldo: <strong>{{ formatBRL(balanceTotal) }}</strong></p>
+</section>
 
       <section>
         <h2>Nova transação</h2>
