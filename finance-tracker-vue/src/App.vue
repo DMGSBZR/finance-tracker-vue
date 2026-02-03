@@ -2,6 +2,7 @@
 import { ref, watch, computed, nextTick } from 'vue';
 import SummaryCards from './components/SummaryCards.vue';
 import FiltersBar from './components/FiltersBar.vue';
+import TransactionsTable from './components/TransactionsTable.vue';
 
 const STORAGE_KEY = 'finance-tracker-transactions';
 const transactions = ref([]);
@@ -315,34 +316,13 @@ function deleteTransaction(id) {
   </div>
 
   <!-- 3) Tabela normal -->
-  <div v-else class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Data</th>
-          <th>Tipo</th>
-          <th>Categoria</th>
-          <th>Descrição</th>
-          <th>Valor</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <tr v-for="tx in visibleTransactions" :key="tx.id">
-          <td>{{ tx.date }}</td>
-          <td>{{ tx.type === "income" ? "Receita" : "Despesa" }}</td>
-          <td>{{ tx.category }}</td>
-          <td>{{ tx.description }}</td>
-          <td>R$ {{ Number(tx.amount).toFixed(2) }}</td>
-          <td>
-            <button type="button" @click="editTransaction(tx)">Editar</button>
-            <button type="button" @click="deleteTransaction(tx.id)">Excluir</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <div v-else>
+  <TransactionsTable
+    :items="visibleTransactions"
+    @edit="editTransaction"
+    @delete="deleteTransaction"
+  />
+</div>
 </section>
     </main>
 
