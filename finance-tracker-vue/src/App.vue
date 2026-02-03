@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue';
+import SummaryCards from './components/SummaryCards.vue';
 
 const STORAGE_KEY = 'finance-tracker-transactions';
 const transactions = ref([]);
@@ -45,42 +46,6 @@ const visibleTransactions = computed(() => {
         (tx.description || "").toLowerCase().includes(query)
     );
   }
-  const incomeTotal = computed(() => {
-  return visibleTransactions.value
-    .filter((tx) => tx.type === "income")
-    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-});
-
-const expenseTotal = computed(() => {
-  return visibleTransactions.value
-    .filter((tx) => tx.type === "expense")
-    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-});
-
-const balanceTotal = computed(() => incomeTotal.value - expenseTotal.value);
-
-function formatBRL(value) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
-const hasTransactions = computed(() => transactions.value.length > 0);
-const hasVisibleTransactions = computed(() => visibleTransactions.value.length > 0);
-
-const hasActiveFilters = computed(() => {
-  return (
-    filterType.value !== "all" ||
-    searchText.value.trim() !== "" ||
-    sortBy.value !== "date-desc"
-  );
-});
-
-function clearFilters() {
-  filterType.value = "all";
-  searchText.value = "";
-  sortBy.value = "date-desc";
-}
 
   switch (sortBy.value) {
     case "date-asc":
@@ -99,6 +64,54 @@ function clearFilters() {
 
   return list;
 });
+// =====================
+// Resumo financeiro
+// =====================
+const incomeTotal = computed(() => {
+  return visibleTransactions.value
+    .filter((tx) => tx.type === "income")
+    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+});
+
+const expenseTotal = computed(() => {
+  return visibleTransactions.value
+    .filter((tx) => tx.type === "expense")
+    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+});
+
+const balanceTotal = computed(() => incomeTotal.value - expenseTotal.value);
+
+function formatBrl(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+// =====================
+// Estados de UI
+// =====================
+const hasTransactions = computed(() => transactions.value.length > 0);
+const hasVisibleTransactions = computed(() => visibleTransactions.value.length > 0);
+
+// =====================
+// Filtros ativos
+// =====================
+const hasActiveFilters = computed(() => {
+  return (
+    filterType.value !== "all" ||
+    searchText.value.trim() !== "" ||
+    sortBy.value !== "date-desc"
+  );
+});
+
+function clearFilters() {
+  filterType.value = "all";
+  searchText.value = "";
+  sortBy.value = "date-desc";
+}
+
+
 
     const form = ref({
       type: '',
@@ -188,12 +201,12 @@ function deleteTransaction(id) {
     </header>
 
     <main class="container">
-      <section>
-  <h2>Resumo</h2>
-  <p>Receitas: <strong>{{ formatBRL(incomeTotal) }}</strong></p>
-  <p>Despesas: <strong>{{ formatBRL(expenseTotal) }}</strong></p>
-  <p>Saldo: <strong>{{ formatBRL(balanceTotal) }}</strong></p>
-</section>
+      <SummaryCards
+  :income-total="incomeTotal"
+  :expense-total="expenseTotal"
+  :balance-total="balanceTotal"
+  :format-brl="formatBrl"
+/>
 
       <section>
         <h2>Nova transação</h2>
@@ -271,13 +284,9 @@ function deleteTransaction(id) {
     {{ editingId ? "Salvar" : "Adicionar" }}
   </button>
 
-  <button
-    type="button"
-    v-if="editingId"
-    @click="() => { editingId = null; resetForm(); }"
-  >
-    Cancelar Edição
-  </button>
+  <button type="button" v-if="editingId" @click="cancelEdit">
+  Cancelar Edição
+</button>
 
 </form>
       </section>
@@ -340,7 +349,7 @@ function deleteTransaction(id) {
           <td>{{ tx.type === "income" ? "Receita" : "Despesa" }}</td>
           <td>{{ tx.category }}</td>
           <td>{{ tx.description }}</td>
-          <td>{{ formatBRL(tx.amount) }}</td>
+          <td>R$ {{ Number(tx.amount).toFixed(2) }}</td>
           <td>
             <button type="button" @click="editTransaction(tx)">Editar</button>
             <button type="button" @click="deleteTransaction(tx.id)">Excluir</button>
