@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
 
 const STORAGE_KEY = 'finance-tracker-transactions';
 const transactions = ref([]);
@@ -65,6 +65,22 @@ function formatBRL(value) {
     currency: "BRL",
   }).format(value);
 }
+const hasTransactions = computed(() => transactions.value.length > 0);
+const hasVisibleTransactions = computed(() => visibleTransactions.value.length > 0);
+
+const hasActiveFilters = computed(() => {
+  return (
+    filterType.value !== "all" ||
+    searchText.value.trim() !== "" ||
+    sortBy.value !== "date-desc"
+  );
+});
+
+function clearFilters() {
+  filterType.value = "all";
+  searchText.value = "";
+  sortBy.value = "date-desc";
+}
 
   switch (sortBy.value) {
     case "date-asc":
@@ -94,6 +110,7 @@ function formatBRL(value) {
 
     const editingId = ref(null);
     const errors = ref({});
+    const amountInputRef = ref(null);
 
     function validateForm() {
       const e = {};
@@ -141,8 +158,9 @@ function resetForm() {
   };
   errors.value = {};
 }
-function editTransaction(tx) {
+async function editTransaction(tx) {
   editingId.value = tx.id;
+
   form.value = {
     type: tx.type,
     amount: tx.amount,
@@ -150,6 +168,10 @@ function editTransaction(tx) {
     category: tx.category,
     description: tx.description,
   };
+
+  // Espera o DOM atualizar e então foca o campo
+  await nextTick();
+  amountInputRef.value?.focus();
 }
 
 function deleteTransaction(id) {
@@ -181,37 +203,69 @@ function deleteTransaction(id) {
         <form @submit.prevent="submitForm">
 
   <div class="field">
-    <label>Tipo</label>
-    <select v-model="form.type">
-      <option value="">Selecione</option>
-      <option value="income">Receita</option>
-      <option value="expense">Despesa</option>
-    </select>
-    <small class="field-error">{{ errors.type }}</small>
-  </div>
+  <label for="type">Tipo</label>
+
+  <select id="type" v-model="form.type">
+    <option value="">Selecione</option>
+    <option value="income">Receita</option>
+    <option value="expense">Despesa</option>
+  </select>
+
+  <small v-if="errors.type" class="field-error">
+    {{ errors.type }}
+  </small>
+</div>
 
   <div class="field">
-    <label>Valor</label>
-    <input type="number" v-model="form.amount" />
-    <small class="field-error">{{ errors.amount }}</small>
-  </div>
+  <label for="amount">Valor</label>
+
+  <input ref="amountInputRef" type="number" v-model="form.amount" />
+
+  <small v-if="errors.amount" class="field-error">
+    {{ errors.amount }}
+  </small>
+</div>
+
 
   <div class="field">
-    <label>Data</label>
-    <input type="date" v-model="form.date" />
-    <small class="field-error">{{ errors.date }}</small>
-  </div>
+  <label for="date">Data</label>
+
+  <input
+    id="date"
+    type="date"
+    v-model="form.date"
+  />
+
+  <small v-if="errors.date" class="field-error">
+    {{ errors.date }}
+  </small>
+</div>
+
 
   <div class="field">
-    <label>Categoria</label>
-    <input type="text" v-model="form.category" />
-    <small class="field-error">{{ errors.category }}</small>
-  </div>
+  <label for="category">Categoria</label>
+
+  <input
+    id="category"
+    type="text"
+    v-model="form.category"
+  />
+
+  <small v-if="errors.category" class="field-error">
+    {{ errors.category }}
+  </small>
+</div>
+
 
   <div class="field">
-    <label>Descrição</label>
-    <input type="text" v-model="form.description" />
-  </div>
+  <label for="description">Descrição</label>
+
+  <input
+    id="description"
+    type="text"
+    v-model="form.description"
+  />
+</div>
 
   <button type="submit">
     {{ editingId ? "Salvar" : "Adicionar" }}
@@ -224,6 +278,7 @@ function deleteTransaction(id) {
   >
     Cancelar Edição
   </button>
+
 </form>
       </section>
 
@@ -240,9 +295,9 @@ function deleteTransaction(id) {
     v-model="searchText"
   />
 
-  <button type="button" class="btn btn-secondary" disabled>
-    Limpar
-  </button>
+  <button v-if="hasActiveFilters" type="button" class="btn btn-secondary" @click="clearFilters">
+  Limpar filtros
+</button>
 
   <select v-model="sortBy">
     <option value="date-desc">Data (mais recente)</option>
@@ -253,40 +308,48 @@ function deleteTransaction(id) {
 </section>
 
       <section>
-        <h2>Transações</h2>
+  <h2>Transações</h2>
 
-        <section id="ui-state" class="ui-state" hidden role="status" aria-live="polite"></section>
+  <!-- 1) Sem nenhuma transação cadastrada -->
+  <div v-if="!hasTransactions" class="ui-state" role="status" aria-live="polite">
+    Nenhuma transação cadastrada. Adicione sua primeira receita ou despesa.
+  </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Tipo</th>
-                <th>Categoria</th>
-                <th>Descrição</th>
-                <th>Valor</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
+  <!-- 2) Tem transações, mas não tem resultados visíveis -->
+  <div v-else-if="!hasVisibleTransactions" class="ui-state" role="status" aria-live="polite">
+    Nenhum resultado encontrado com os filtros/busca atuais.
+  </div>
 
-            <tbody>
-  <tr v-for="tx in visibleTransactions" :key="tx.id">
-    <td>{{ tx.date }}</td>
-    <td>{{ tx.type === "income" ? "Receita" : "Despesa" }}</td>
-    <td>{{ tx.category }}</td>
-    <td>{{ tx.description }}</td>
-    <td>R$ {{ tx.amount.toFixed(2) }}</td>
-    <td>
-      <button type="button" @click=editTransaction(tx)>editar</button>
-      <button type="button" @click=deleteTransaction(tx.id)>Excluir</button>
-      
-    </td>
-  </tr>
-</tbody>
-          </table>
-        </div>
-      </section>
+  <!-- 3) Tabela normal -->
+  <div v-else class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th>Categoria</th>
+          <th>Descrição</th>
+          <th>Valor</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr v-for="tx in visibleTransactions" :key="tx.id">
+          <td>{{ tx.date }}</td>
+          <td>{{ tx.type === "income" ? "Receita" : "Despesa" }}</td>
+          <td>{{ tx.category }}</td>
+          <td>{{ tx.description }}</td>
+          <td>{{ formatBRL(tx.amount) }}</td>
+          <td>
+            <button type="button" @click="editTransaction(tx)">Editar</button>
+            <button type="button" @click="deleteTransaction(tx.id)">Excluir</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
     </main>
 
     <footer class="container">
