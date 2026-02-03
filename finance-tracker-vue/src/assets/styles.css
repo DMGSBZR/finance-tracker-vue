@@ -15,7 +15,7 @@ main,
 footer {
   max-width: 900px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 12px;
 }
 
 /* 3) Cabeçalho */
@@ -29,8 +29,8 @@ header p {
 
 /* 4) Separação entre blocos */
 section {
-  margin-top: 24px;
-  padding-top: 16px;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid #ddd;
 }
 
@@ -41,7 +41,7 @@ h2 {
 /* 5) Formulário arrumado (sem <br/>) */
 form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   max-width: 520px;
 }
 
@@ -50,11 +50,11 @@ label {
   margin-bottom: 6px;
 }
 
-input,
-select,
-button {
+form input,
+form select,
+form button {
   width: 100%;
-  padding: 10px;
+  padding: 8px;
   font: inherit;
 }
 
@@ -63,6 +63,11 @@ button {
 }
 
 /* 6) Tabela usável */
+table button {
+  width: auto;
+  padding: 6px 10px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -71,7 +76,7 @@ table {
 th,
 td {
   border: 1px solid #ddd;
-  padding: 10px;
+  padding: 8px;
   text-align: left;
   vertical-align: top;
 }
@@ -87,8 +92,11 @@ tbody tr:hover {
 /* 7) Mobile: permitir rolagem horizontal da tabela */
 .table-wrap {
   overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
 }
-.filters{
+
+.filters {
   display: flex;
   gap: 12px;
   margin-bottom: 12px;
@@ -96,25 +104,40 @@ tbody tr:hover {
   flex-wrap: wrap;
   align-items: center;
 }
-/* 8) aula10 */
+
+.filters select,
+.filters input,
+.filters button {
+  width: auto;
+}
+
+.filters input {
+  flex: 1;
+  min-width: 220px;
+}
+
+/* 8) Feedback */
 .feedback {
   margin: 12px 0;
   padding: 12px 14px;
   border-radius: 10px;
   font-size: 0.95rem;
   line-height: 1.2;
-  display: none;
+  display: block;
+
+  /* Aula 8: manter visível ao rolar */
+  position: sticky;
+  top: 12px;
+  z-index: 50;
 }
 
 .feedback--success {
-  display: block;
   background-color: #e9f7ee;
   border: 1px solid #1f8a3b;
   color: #14532d;
 }
 
 .feedback--error {
-  display: block;
   background-color: #fdecec;
   border: 1px solid #b42318;
   color: #7a1210;
@@ -147,6 +170,7 @@ button:focus {
   outline: 2px solid #111;
   outline-offset: 2px;
 }
+
 /* Botões padrão */
 .btn {
   padding: 10px 12px;
@@ -165,16 +189,17 @@ button:focus {
   border-color: #555;
   font-weight: 600;
 }
+
 .btn-secondary {
   border-color: #999;
   font-weight: 600;
 }
 
 /* Estado da UI */
-
 .ui-state {
   transition: opacity 0.15s ease;
 }
+
 .ui-state {
   border: 1px dashed #bbb;
   border-radius: 12px;
@@ -199,8 +224,8 @@ button:focus {
   flex-wrap: wrap;
   align-items: center;
 }
-/* ===== Aula 14: Loading / Skeleton ===== */
 
+/* ===== Aula 14: Loading / Skeleton ===== */
 .skeleton-row td {
   height: 18px;
   background: linear-gradient(
@@ -222,9 +247,83 @@ button:focus {
     background-position: 0 50%;
   }
 }
+
 /* ===== Aula 14: micro-interação delete ===== */
 tr.is-removing {
   opacity: 0;
   transform: translateY(-4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Layout desktop: resumo + form lado a lado */
+.top-grid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 900px) {
+  .top-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  /* Aula 8: no grid, o form deve ocupar a coluna inteira */
+  .top-grid form {
+    max-width: none;
+  }
+
+  /* Aula 8: no desktop, filtros não devem ficar limitados a 520px */
+  .filters {
+    max-width: none;
+  }
+
+  /* Opcional: tabela um pouco menor no desktop (se quiser mais “acima da dobra”) */
+  .table-wrap {
+    max-height: 300px;
+  }
+}
+/* =========================
+   App Shell (layout de app)
+   ========================= */
+.app-shell {
+  display: grid;
+  gap: 16px;
+}
+
+/* Desktop: 2 colunas */
+@media (min-width: 900px) {
+  .app-shell {
+    grid-template-columns: 360px 1fr;
+    align-items: start;
+  }
+}
+
+/* Painéis (cards) */
+.panel {
+  border: 1px solid #e3e3e3;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+}
+
+/* Título dentro do painel (opcional) */
+.panel-title {
+  margin: 0 0 12px;
+}
+
+/* Separador leve */
+.panel-divider {
+  height: 1px;
+  background: #eee;
+  margin: 12px 0;
+}
+/* Tabela: cabeçalho fixo dentro da área rolável */
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f5f5f5;
+}
+tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.015);
 }
