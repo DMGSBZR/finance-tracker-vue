@@ -1,9 +1,9 @@
 <script setup>
-const props = defineProps({
+defineProps({
   incomeTotal: { type: Number, required: true },
   expenseTotal: { type: Number, required: true },
   balanceTotal: { type: Number, required: true },
-  formatBRL: { type: Function, required: true },
+  formatBrl: { type: Function, required: true },
 });
 </script>
 

@@ -1,9 +1,17 @@
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue';
 import SummaryCards from './components/SummaryCards.vue';
+import FiltersBar from './components/FiltersBar.vue';
 
 const STORAGE_KEY = 'finance-tracker-transactions';
 const transactions = ref([]);
+
+function formatBrl(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
 
 function loadTransactions() {
  const raw = localStorage.getItem(STORAGE_KEY);
@@ -81,12 +89,6 @@ const expenseTotal = computed(() => {
 
 const balanceTotal = computed(() => incomeTotal.value - expenseTotal.value);
 
-function formatBrl(value) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
 
 // =====================
 // Estados de UI
@@ -201,6 +203,7 @@ function deleteTransaction(id) {
     </header>
 
     <main class="container">
+
       <SummaryCards
   :income-total="incomeTotal"
   :expense-total="expenseTotal"
@@ -291,31 +294,13 @@ function deleteTransaction(id) {
 </form>
       </section>
 
-      <section class="filters" aria-label="Filtros de transações">
-  <select v-model="filterType">
-    <option value="all">Todas</option>
-    <option value="income">Receitas</option>
-    <option value="expense">Despesas</option>
-  </select>
-
-  <input
-    type="text"
-    placeholder="Buscar por categoria ou descrição"
-    v-model="searchText"
-  />
-
-  <button v-if="hasActiveFilters" type="button" class="btn btn-secondary" @click="clearFilters">
-  Limpar filtros
-</button>
-
-  <select v-model="sortBy">
-    <option value="date-desc">Data (mais recente)</option>
-    <option value="date-asc">Data (mais antiga)</option>
-    <option value="amount-desc">Valor (maior)</option>
-    <option value="amount-asc">Valor (menor)</option>
-  </select>
-</section>
-
+     <FiltersBar
+  v-model:filterType="filterType"
+  v-model:searchText="searchText"
+  v-model:sortBy="sortBy"
+  :has-active-filters="hasActiveFilters"
+  @clear="clearFilters"
+/>
       <section>
   <h2>Transações</h2>
 
