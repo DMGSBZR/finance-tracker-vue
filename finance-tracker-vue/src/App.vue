@@ -1,8 +1,9 @@
 <script setup>
-import { ref, watch, computed, nextTick } from 'vue';
+import { ref, watch, computed} from 'vue';
 import SummaryCards from './components/SummaryCards.vue';
 import FiltersBar from './components/FiltersBar.vue';
 import TransactionsTable from './components/TransactionsTable.vue';
+import TransactionForm from './components/TransactionForm.vue';
 
 const STORAGE_KEY = 'finance-tracker-transactions';
 const transactions = ref([]);
@@ -126,7 +127,6 @@ function clearFilters() {
 
     const editingId = ref(null);
     const errors = ref({});
-    const amountInputRef = ref(null);
 
     function validateForm() {
       const e = {};
@@ -174,7 +174,7 @@ function resetForm() {
   };
   errors.value = {};
 }
-async function editTransaction(tx) {
+function editTransaction(tx) {
   editingId.value = tx.id;
 
   form.value = {
@@ -184,9 +184,15 @@ async function editTransaction(tx) {
     category: tx.category,
     description: tx.description,
   };
+}
+
+function cancelEdit() {
+  editingId.value = null;
+  resetForm();
+}
 
   // Espera o DOM atualizar e então foca o campo
-  await nextTick();
+  await nextTick();{
   amountInputRef.value?.focus();
 }
 
@@ -212,88 +218,13 @@ function deleteTransaction(id) {
   :format-brl="formatBrl"
 />
 
-      <section>
-        <h2>Nova transação</h2>
-
-        <div id="feedback" class="feedback" aria-live="polite" aria-atomic="true"></div>
-
-        <form @submit.prevent="submitForm">
-
-  <div class="field">
-  <label for="type">Tipo</label>
-
-  <select id="type" v-model="form.type">
-    <option value="">Selecione</option>
-    <option value="income">Receita</option>
-    <option value="expense">Despesa</option>
-  </select>
-
-  <small v-if="errors.type" class="field-error">
-    {{ errors.type }}
-  </small>
-</div>
-
-  <div class="field">
-  <label for="amount">Valor</label>
-
-  <input ref="amountInputRef" type="number" v-model="form.amount" />
-
-  <small v-if="errors.amount" class="field-error">
-    {{ errors.amount }}
-  </small>
-</div>
-
-
-  <div class="field">
-  <label for="date">Data</label>
-
-  <input
-    id="date"
-    type="date"
-    v-model="form.date"
-  />
-
-  <small v-if="errors.date" class="field-error">
-    {{ errors.date }}
-  </small>
-</div>
-
-
-  <div class="field">
-  <label for="category">Categoria</label>
-
-  <input
-    id="category"
-    type="text"
-    v-model="form.category"
-  />
-
-  <small v-if="errors.category" class="field-error">
-    {{ errors.category }}
-  </small>
-</div>
-
-
-  <div class="field">
-  <label for="description">Descrição</label>
-
-  <input
-    id="description"
-    type="text"
-    v-model="form.description"
-  />
-</div>
-
-  <button type="submit">
-    {{ editingId ? "Salvar" : "Adicionar" }}
-  </button>
-
-  <button type="button" v-if="editingId" @click="cancelEdit">
-  Cancelar Edição
-</button>
-
-</form>
-      </section>
+      <TransactionForm
+  v-model="form"
+  :errors="errors"
+  :is-editing="!!editingId"
+  @submit="submitForm"
+  @cancel="cancelEdit"
+/>
 
      <FiltersBar
   v-model:filterType="filterType"
