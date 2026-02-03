@@ -278,8 +278,8 @@ function deleteTransaction(id) {
     <td>{{ tx.description }}</td>
     <td>R$ {{ tx.amount.toFixed(2) }}</td>
     <td>
-      <button type="button @click="editTransaction(tx)>editar</button>
-      <button type="button @click="deleteTransaction(tx.id)>Excluir</button>
+      <button type="button" @click=editTransaction(tx)>editar</button>
+      <button type="button" @click=deleteTransaction(tx.id)>Excluir</button>
       
     </td>
   </tr>
