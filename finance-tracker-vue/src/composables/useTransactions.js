@@ -1,4 +1,12 @@
 import { ref } from "vue";
+import { TRANSACTION_TYPES } from "../domain/transactionTypes";
+import { CATEGORIES } from "../domain/categories";
+
+function isValidCategory(type, category) {
+  if (!type || !category) return false;
+
+  return CATEGORIES[type]?.includes(category);
+}
 
 export function useTransactions(transactionsRef) {
   const form = ref({
@@ -30,7 +38,9 @@ export function useTransactions(transactionsRef) {
     if (!form.value.amount || Number(form.value.amount) <= 0)
       e.amount = "Informe um valor válido";
     if (!form.value.date) e.date = "Informe a data";
-    if (!form.value.category.trim()) e.category = "Informe a categoria";
+    if (!isValidCategory(form.value.type, form.value.category)) {
+  e.category = "Categoria inválida para o tipo selecionado";
+}
 
     errors.value = e;
     return Object.keys(e).length === 0;

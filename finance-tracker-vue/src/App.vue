@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
+import { TRANSACTION_TYPES } from "./domain/transactionTypes";
+import { CATEGORIES } from "./domain/categories";
 
 import SummaryCards from "./components/SummaryCards.vue";
 import TransactionForm from "./components/TransactionForm.vue";
@@ -128,6 +130,12 @@ const visibleTransactions = computed(() => {
   return list;
 });
 
+/* Categorias disponíveis (para o formulário) */
+const availableCategories = computed(() => {
+  if (!form.value.type) return [];
+  return CATEGORIES[form.value.type] ?? [];
+});
+
 /* ======================================================
  * 4) Helpers de UI + resumo financeiro
  * ====================================================== */
@@ -140,13 +148,13 @@ function formatBrl(value) {
 
 const incomeTotal = computed(() =>
   visibleTransactions.value
-    .filter((tx) => tx.type === "income")
+    .filter((tx) => tx.type === TRANSACTION_TYPES.INCOME)
     .reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
 );
 
 const expenseTotal = computed(() =>
   visibleTransactions.value
-    .filter((tx) => tx.type === "expense")
+    .filter((tx) => tx.type === TRANSACTION_TYPES.EXPENSE)
     .reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
 );
 
@@ -205,12 +213,13 @@ function clearFilters() {
       <h2>Nova transação</h2>
 
       <TransactionForm
-        v-model="form"
-        :errors="errors"
-        :is-editing="!!editingId"
-        @submit="handleSubmit"
-        @cancel="cancelEdit"
-      />
+  v-model="form"
+  :errors="errors"
+  :is-editing="!!editingId"
+  :categories="availableCategories"
+  @submit="handleSubmit"
+  @cancel="cancelEdit"
+/>
     </section>
 
     <!-- Coluna direita: resumo + filtros + lista -->

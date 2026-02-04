@@ -2,9 +2,10 @@
 import { computed, nextTick, ref, watch } from "vue";
 
 const props = defineProps({
-  modelValue: { type: Object, required: true }, // form
+  modelValue: { type: Object, required: true },
   errors: { type: Object, required: true },
   isEditing: { type: Boolean, required: true },
+  categories: { type: Array, required: true },
 });
 
 const emit = defineEmits(["update:modelValue", "submit", "cancel"]);
@@ -15,6 +16,13 @@ const amountInputRef = ref(null);
 const updateField = (key, value) => {
   emit("update:modelValue", { ...props.modelValue, [key]: value });
 };
+ // Quando muda o tipo, a categoria anterior pode ficar inválida
+watch(
+  () => props.modelValue.type,
+  () => {
+    updateField("category", "");
+  }
+);
 
 // Foco automático quando entrar em modo edição
 watch(
@@ -53,16 +61,26 @@ const submitLabel = computed(() => (props.isEditing ? "Salvar" : "Adicionar"));
       </div>
 
       <div class="field">
-        <label for="amount">Valor</label>
+  <label for="category">Categoria</label>
 
-        <input
-          id="amount"
-          ref="amountInputRef"
-          type="number"
-          :value="modelValue.amount"
-          @input="updateField('amount', $event.target.value)"
-        />
+  <select
+    id="category"
+    :value="modelValue.category"
+    @change="updateField('category', $event.target.value)"
+    :disabled="props.categories.length === 0"
+  >
+    <option value="">Selecione uma categoria</option>
 
+    <option
+      v-for="category in props.categories"
+      :key="category"
+      :value="category"
+    >
+      {{ category }}
+    </option>
+  </select>
+
+       <small v-if="errors.category" class="field-error">{{ errors.category }}</small>
         <small v-if="errors.amount" class="field-error">{{ errors.amount }}</small>
       </div>
 
