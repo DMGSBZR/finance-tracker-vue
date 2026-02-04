@@ -270,14 +270,123 @@ function clearFilters() {
   sortBy.value = "date-desc";
 }
 
+/* ======================================================
+ * 7) Backup: Export / Import (Aula 12)
+ * ====================================================== */
+
+const importInputRef = ref(null);
+
+function exportBackup() {
+  try {
+    const payload = {
+      version: TRANSACTIONS_SCHEMA_VERSION,
+      transactions: transactions.value,
+      exportedAt: new Date().toISOString(),
+    };
+
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+
+    const dateTag = new Date().toISOString().slice(0, 10);
+    a.download = `finance-tracker-backup-${dateTag}.json`;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+
+    showFeedback("Backup exportado com sucesso");
+  } catch (e) {
+    console.error(e);
+    showFeedback("Falha ao exportar backup", "error");
+  }
+}
+
+function triggerImport() {
+  importInputRef.value?.click();
+}
+
+async function handleImportFileChange(event) {
+  const file = event.target.files?.[0];
+  // permite importar o mesmo arquivo de novo
+  event.target.value = "";
+
+  if (!file) return;
+
+  if (
+    file.type &&
+    file.type !== "application/json" &&
+    !file.name.toLowerCase().endsWith(".json")
+  ) {
+    showFeedback("Arquivo inválido. Selecione um .json", "error");
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    // Aceita 2 formatos:
+    // A) Novo: { version, transactions }
+    // B) Legado: [ ...transactions ]
+    let rawList = null;
+
+    if (Array.isArray(data)) {
+      rawList = data;
+    } else if (data && typeof data === "object" && Array.isArray(data.transactions)) {
+      rawList = data.transactions;
+    } else {
+      showFeedback("Estrutura inválida no JSON de backup", "error");
+      return;
+    }
+
+    // Domínio manda: normaliza SEMPRE
+    const normalized = normalizeTransactionsList(rawList);
+
+    // Substitui a fonte de verdade
+    transactions.value = normalized;
+
+    // Opcional: limpa filtros pra evitar “sumir” itens após importar
+    clearFilters();
+
+    showFeedback("Backup importado com sucesso");
+  } catch (e) {
+    console.error(e);
+    showFeedback("Falha ao importar: JSON inválido", "error");
+  }
+}
+
 </script>
 
 <template>
   <div>
     <header class="container">
+  <div class="header-row">
+    <div>
       <h1>Finance Tracker</h1>
       <p>Controle simples de receitas e despesas</p>
-    </header>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" @click="exportBackup">Exportar</button>
+      <button type="button" @click="triggerImport">Importar</button>
+
+      <!-- input escondido para selecionar o arquivo -->
+      <input
+        ref="importInputRef"
+        type="file"
+        accept="application/json,.json"
+        class="sr-only"
+        @change="handleImportFileChange"
+      />
+    </div>
+  </div>
+</header>
 
     <main class="container">
   <div
