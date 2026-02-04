@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { TRANSACTION_TYPES } from "./domain/transactionTypes";
 import { CATEGORIES } from "./domain/categories";
 
@@ -16,66 +16,47 @@ import {
   TRANSACTIONS_SCHEMA_VERSION,
 } from "./domain/normalizeTransactions";
 
+/* ======================================================
+ * 0) Migração/normalização 
+ * ====================================================== */
 function migrateTransactions(raw) {
   // legado: array direto
   if (Array.isArray(raw)) {
     const normalized = normalizeTransactionsList(raw);
-
-    return {
-      version: TRANSACTIONS_SCHEMA_VERSION,
-      transactions: normalized,
-    };
+    return { version: TRANSACTIONS_SCHEMA_VERSION, transactions: normalized };
   }
 
   // formato novo
   if (raw && typeof raw === "object") {
     const normalized = normalizeTransactionsList(raw.transactions);
-
-    return {
-      version: TRANSACTIONS_SCHEMA_VERSION,
-      transactions: normalized,
-    };
+    return { version: TRANSACTIONS_SCHEMA_VERSION, transactions: normalized };
   }
 
   // nada salvo
-  return {
-    version: TRANSACTIONS_SCHEMA_VERSION,
-    transactions: [],
-  };
+  return { version: TRANSACTIONS_SCHEMA_VERSION, transactions: [] };
 }
 
 /* ======================================================
- * 1) Fonte de verdade + composables
+ * 1) Fonte de verdade + persistência versionada
  * ====================================================== */
-
 const STORAGE_KEY = "finance-tracker-transactions";
 
-/**
- * storageRaw é APENAS infra (pode vir legado: array / ou novo: {version, transactions})
- * default null para conseguirmos distinguir "não existe" vs "array vazio".
- */
+// storageRaw é APENAS infra (pode vir legado: array / ou novo: {version, transactions})
 const storageRaw = useLocalStorage(STORAGE_KEY, null);
 
-/**
- * Migra/normaliza uma vez ao carregar.
- * migrated = { version, transactions }
- */
+// migra/normaliza uma vez ao carregar
 const migrated = migrateTransactions(storageRaw.value);
 
-/**
- * Fonte de verdade do app: SEMPRE um array normalizado.
- */
+// fonte de verdade do app: SEMPRE um array normalizado
 const transactions = ref(migrated.transactions);
 
-/**
- * Persistimos imediatamente já no schema novo (versionado),
- * para não precisar migrar toda vez.
- */
+// regrava storage somente se necessário (legado/null/versão diferente)
 const rawBefore = storageRaw.value;
 const needsRewrite =
   Array.isArray(rawBefore) ||
   rawBefore == null ||
-  (rawBefore && typeof rawBefore === "object" &&
+  (rawBefore &&
+    typeof rawBefore === "object" &&
     Number(rawBefore.version) !== TRANSACTIONS_SCHEMA_VERSION);
 
 if (needsRewrite) {
@@ -85,10 +66,7 @@ if (needsRewrite) {
   };
 }
 
-/**
- * Mantém persistência reativa no schema novo.
- */
-
+// mantém persistência reativa no schema novo
 watch(
   transactions,
   (list) => {
@@ -99,16 +77,6 @@ watch(
   },
   { deep: true }
 );
-
-const {
-  form,
-  errors,
-  editingId,
-  submitForm: submitTransaction,
-  cancelEdit,
-  editTransaction: editTx,
-  deleteTransaction: deleteTx,
-} = useTransactions(transactions);
 
 /* ======================================================
  * Feedback de UX
@@ -126,14 +94,131 @@ function showFeedback(message, type = "success") {
 }
 
 /* ======================================================
- * Handlers de UI (com feedback)
+ * 1.1) Histórico (Undo / Redo) 
+ * ====================================================== */
+const undoStack = ref([]); // snapshots (arrays de tx)
+const redoStack = ref([]);
+const HISTORY_LIMIT = 50;
+
+function cloneSnapshot(list) {
+  return JSON.parse(JSON.stringify(list));
+}
+
+function pushUndo(snapshotBeforeChange) {
+  undoStack.value.push(snapshotBeforeChange);
+
+  if (undoStack.value.length > HISTORY_LIMIT) {
+    undoStack.value.shift();
+  }
+
+  // mudança nova invalida redo
+  redoStack.value = [];
+}
+
+const canUndo = computed(() => undoStack.value.length > 0);
+const canRedo = computed(() => redoStack.value.length > 0);
+
+function undo() {
+  if (!canUndo.value) return;
+
+  const current = cloneSnapshot(transactions.value);
+  const previous = undoStack.value.pop();
+
+  redoStack.value.push(current);
+  transactions.value = previous;
+
+  showFeedback("Desfez a última ação");
+}
+
+function redo() {
+  if (!canRedo.value) return;
+
+  const current = cloneSnapshot(transactions.value);
+  const next = redoStack.value.pop();
+
+  undoStack.value.push(current);
+  transactions.value = next;
+
+  showFeedback("Refez a última ação");
+}
+
+function isTypingTarget(el) {
+  if (!el) return false;
+  const tag = el.tagName?.toLowerCase();
+  return (
+    tag === "input" ||
+    tag === "textarea" ||
+    tag === "select" ||
+    el.isContentEditable
+  );
+}
+
+function onKeyDown(e) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (isTypingTarget(e.target)) return;
+
+  const key = e.key.toLowerCase();
+
+  // Ctrl/Cmd+Z (undo)
+  if (key === "z" && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+    return;
+  }
+
+  // Ctrl/Cmd+Shift+Z (redo) ou Ctrl/Cmd+Y
+  if ((key === "z" && e.shiftKey) || key === "y") {
+    e.preventDefault();
+    redo();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", onKeyDown);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeyDown);
+});
+
+/* ======================================================
+ * 2) Composable de domínio (form + CRUD)
+ * ====================================================== */
+const {
+  form,
+  errors,
+  editingId,
+  submitForm: submitTransaction,
+  cancelEdit,
+  editTransaction: editTx,
+  deleteTransaction: deleteTx,
+} = useTransactions(transactions);
+
+/* ======================================================
+ * 3) Estado de UI (filtros + animação remoção)
+ * ====================================================== */
+const filterType = ref("all");
+const searchText = ref("");
+const sortBy = ref("date-desc");
+const removingIds = ref(new Set());
+
+function clearFilters() {
+  filterType.value = "all";
+  searchText.value = "";
+  sortBy.value = "date-desc";
+}
+
+/* ======================================================
+ * 4) Handlers de UI (com feedback + histórico)
  * ====================================================== */
 function handleSubmit() {
   const wasEditing = !!editingId.value;
+  const before = cloneSnapshot(transactions.value);
 
   submitTransaction();
 
   if (Object.keys(errors.value).length === 0) {
+    pushUndo(before);
     showFeedback(
       wasEditing
         ? "Transação atualizada com sucesso"
@@ -152,32 +237,21 @@ async function handleDelete(id) {
   );
   if (!confirmed) return;
 
-  // Marca como removendo (ativa animação CSS)
   removingIds.value.add(id);
-
-  // Espera a animação (0.15s = seu CSS)
   await new Promise((resolve) => setTimeout(resolve, 160));
 
-  // Remove de fato
+  const before = cloneSnapshot(transactions.value);
+
   deleteTx(id);
 
-  // Limpa estado
-  removingIds.value.delete(id);
+  pushUndo(before);
 
+  removingIds.value.delete(id);
   showFeedback("Transação removida com sucesso");
 }
 
-
 /* ======================================================
- * 2) Estado de UI (filtros)
- * ====================================================== */
-const filterType = ref("all");
-const searchText = ref("");
-const sortBy = ref("date-desc");
-const removingIds = ref(new Set());
-
-/* ======================================================
- * 3) Derivados (lista visível)
+ * 5) Derivados (lista visível + categorias)
  * ====================================================== */
 const visibleTransactions = computed(() => {
   let list = [...transactions.value];
@@ -213,14 +287,13 @@ const visibleTransactions = computed(() => {
   return list;
 });
 
-/* Categorias disponíveis (para o formulário) */
 const availableCategories = computed(() => {
   if (!form.value.type) return [];
   return CATEGORIES[form.value.type] ?? [];
 });
 
 /* ======================================================
- * 4) Helpers de UI + resumo financeiro
+ * 6) Resumo financeiro
  * ====================================================== */
 function formatBrl(value) {
   return new Intl.NumberFormat("pt-BR", {
@@ -241,17 +314,13 @@ const expenseTotal = computed(() =>
     .reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
 );
 
-const balanceTotal = computed(
-  () => incomeTotal.value - expenseTotal.value
-);
+const balanceTotal = computed(() => incomeTotal.value - expenseTotal.value);
 
 /* ======================================================
- * 5) Estados derivados de UI
+ * 7) Estados derivados de UI
  * ====================================================== */
 const hasTransactions = computed(() => transactions.value.length > 0);
-const hasVisibleTransactions = computed(
-  () => visibleTransactions.value.length > 0
-);
+const hasVisibleTransactions = computed(() => visibleTransactions.value.length > 0);
 
 const hasActiveFilters = computed(() => {
   return (
@@ -262,18 +331,8 @@ const hasActiveFilters = computed(() => {
 });
 
 /* ======================================================
- * 6) Actions de UI
+ * 8) Backup: Export / Import + histórico
  * ====================================================== */
-function clearFilters() {
-  filterType.value = "all";
-  searchText.value = "";
-  sortBy.value = "date-desc";
-}
-
-/* ======================================================
- * 7) Backup: Export / Import (Aula 12)
- * ====================================================== */
-
 const importInputRef = ref(null);
 
 function exportBackup() {
@@ -313,8 +372,7 @@ function triggerImport() {
 
 async function handleImportFileChange(event) {
   const file = event.target.files?.[0];
-  // permite importar o mesmo arquivo de novo
-  event.target.value = "";
+  event.target.value = ""; // permite importar o mesmo arquivo de novo
 
   if (!file) return;
 
@@ -345,126 +403,142 @@ async function handleImportFileChange(event) {
       return;
     }
 
-    // Domínio manda: normaliza SEMPRE
     const normalized = normalizeTransactionsList(rawList);
 
-    // Substitui a fonte de verdade
+    const before = cloneSnapshot(transactions.value);
+
     transactions.value = normalized;
+    pushUndo(before);
 
-    // Opcional: limpa filtros pra evitar “sumir” itens após importar
     clearFilters();
-
     showFeedback("Backup importado com sucesso");
   } catch (e) {
     console.error(e);
     showFeedback("Falha ao importar: JSON inválido", "error");
   }
 }
-
 </script>
 
 <template>
   <div>
     <header class="container">
-  <div class="header-row">
-    <div>
-      <h1>Finance Tracker</h1>
-      <p>Controle simples de receitas e despesas</p>
-    </div>
+      <div class="header-row">
+        <div>
+          <h1>Finance Tracker</h1>
+          <p>Controle simples de receitas e despesas</p>
+        </div>
 
-    <div class="header-actions">
-      <button type="button" @click="exportBackup">Exportar</button>
-      <button type="button" @click="triggerImport">Importar</button>
+        <div class="header-actions">
+          <button
+            type="button"
+            @click="undo"
+            :disabled="!canUndo"
+            :aria-disabled="!canUndo"
+            title="Desfazer (Ctrl/Cmd+Z)"
+          >
+            Desfazer
+          </button>
 
-      <!-- input escondido para selecionar o arquivo -->
-      <input
-        ref="importInputRef"
-        type="file"
-        accept="application/json,.json"
-        class="sr-only"
-        @change="handleImportFileChange"
-      />
-    </div>
-  </div>
-</header>
+          <button
+            type="button"
+            @click="redo"
+            :disabled="!canRedo"
+            :aria-disabled="!canRedo"
+            title="Refazer (Ctrl/Cmd+Shift+Z ou Ctrl/Cmd+Y)"
+          >
+            Refazer
+          </button>
+
+          <button type="button" @click="exportBackup">Exportar</button>
+          <button type="button" @click="triggerImport">Importar</button>
+
+          <input
+            ref="importInputRef"
+            type="file"
+            accept="application/json,.json"
+            class="sr-only"
+            @change="handleImportFileChange"
+          />
+        </div>
+      </div>
+    </header>
 
     <main class="container">
-  <div
-    v-if="feedbackMessage"
-    class="feedback"
-    :class="`feedback--${feedbackType}`"
-    role="status"
-    aria-live="polite"
-  >
-    {{ feedbackMessage }}
-  </div>
-
-  <div class="app-shell">
-    <!-- Coluna esquerda: criação/edição -->
-    <section class="panel">
-      <h2>Nova transação</h2>
-
-      <TransactionForm
-  v-model="form"
-  :errors="errors"
-  :is-editing="!!editingId"
-  :categories="availableCategories"
-  @submit="handleSubmit"
-  @cancel="cancelEdit"
-/>
-    </section>
-
-    <!-- Coluna direita: resumo + filtros + lista -->
-    <section class="panel">
-      <SummaryCards
-        :income-total="incomeTotal"
-        :expense-total="expenseTotal"
-        :balance-total="balanceTotal"
-        :format-brl="formatBrl"
-      />
-
-      <FiltersBar
-        v-model:filterType="filterType"
-        v-model:searchText="searchText"
-        v-model:sortBy="sortBy"
-        :has-active-filters="hasActiveFilters"
-        @clear="clearFilters"
-      />
-
-      <div class="panel-divider"></div>
-
-      <h2 class="panel-title">Transações</h2>
-
       <div
-        v-if="!hasTransactions"
-        class="ui-state"
+        v-if="feedbackMessage"
+        class="feedback"
+        :class="`feedback--${feedbackType}`"
         role="status"
         aria-live="polite"
       >
-        Nenhuma transação cadastrada. Adicione sua primeira receita ou despesa.
+        {{ feedbackMessage }}
       </div>
 
-      <div
-        v-else-if="!hasVisibleTransactions"
-        class="ui-state"
-        role="status"
-        aria-live="polite"
-      >
-        Nenhum resultado encontrado com os filtros/busca atuais.
-      </div>
+      <div class="app-shell">
+        <!-- Coluna esquerda: criação/edição -->
+        <section class="panel">
+          <h2>Nova transação</h2>
 
-      <div v-else class="table-wrap">
-        <TransactionsTable
-  :items="visibleTransactions"
-  :removing-ids="removingIds"
-  @edit="handleEdit"
-  @delete="handleDelete"
-/>
-      </div>
-    </section>
-  </div>
-</main>
+          <TransactionForm
+            v-model="form"
+            :errors="errors"
+            :is-editing="!!editingId"
+            :categories="availableCategories"
+            @submit="handleSubmit"
+            @cancel="cancelEdit"
+          />
+        </section>
 
+        <!-- Coluna direita: resumo + filtros + lista -->
+        <section class="panel">
+          <SummaryCards
+            :income-total="incomeTotal"
+            :expense-total="expenseTotal"
+            :balance-total="balanceTotal"
+            :format-brl="formatBrl"
+          />
+
+          <FiltersBar
+            v-model:filterType="filterType"
+            v-model:searchText="searchText"
+            v-model:sortBy="sortBy"
+            :has-active-filters="hasActiveFilters"
+            @clear="clearFilters"
+          />
+
+          <div class="panel-divider"></div>
+
+          <h2 class="panel-title">Transações</h2>
+
+          <div
+            v-if="!hasTransactions"
+            class="ui-state"
+            role="status"
+            aria-live="polite"
+          >
+            Nenhuma transação cadastrada. Adicione sua primeira receita ou despesa.
+          </div>
+
+          <div
+            v-else-if="!hasVisibleTransactions"
+            class="ui-state"
+            role="status"
+            aria-live="polite"
+          >
+            Nenhum resultado encontrado com os filtros/busca atuais.
+          </div>
+
+          <div v-else class="table-wrap">
+            <TransactionsTable
+              :items="visibleTransactions"
+              :removing-ids="removingIds"
+              @edit="handleEdit"
+              @delete="handleDelete"
+            />
+          </div>
+        </section>
+      </div>
+    </main>
 
     <footer class="container">
       <p>Finance Tracker — projeto de estudo</p>
