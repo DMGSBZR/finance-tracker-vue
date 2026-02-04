@@ -257,15 +257,29 @@ function handleAddCategory() {
   showFeedback("Categoria adicionada");
 }
 
+function countTransactionsUsingCategory(type, category) {
+  return transactions.value.filter(
+    (tx) => tx.type === type && tx.category === category
+  ).length;
+}
+
 function handleRemoveCategory(name) {
-  const confirmed = window.confirm(`Remover a categoria "${name}"?`);
+  const type = manageType.value;
+  const affectedCount = countTransactionsUsingCategory(type, name);
+
+  let message = `Remover a categoria "${name}"?`;
+
+  if (affectedCount > 0) {
+    message += `\n\n⚠️ ${affectedCount} transação(ões) usam esta categoria e ficarão sem categoria.`;
+  }
+
+  const confirmed = window.confirm(message);
   if (!confirmed) return;
 
   const before = cloneSnapshot();
 
-  removeCategory(manageType.value, name);
+  removeCategory(type, name);
 
-  // remove categorias inválidas das transações
   transactions.value = normalizeTransactionsList(
     transactions.value,
     categoriesByType.value
