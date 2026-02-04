@@ -31,7 +31,7 @@ if (t === "EXPENSE") return TRANSACTION_TYPES.EXPENSE;
  * Aqui vamos retornar "" para não mascarar dado errado.
  */
 function normalizeCategory(type, rawCategory) {
-  const allowed = CATEGORIES[type] ?? [];
+  const allowed = categoriesByType?.[type] ?? [];
   if (!rawCategory) return "";
   return allowed.includes(rawCategory) ? rawCategory : "";
 }
@@ -94,7 +94,7 @@ function normalizeOne(raw) {
  * - Remove itens inválidos (não-objeto)
  * - Normaliza campos
  */
-export function normalizeTransactionsList(rawList) {
+export function normalizeTransactionsList(rawList, categoriesByType = CATEGORIES) {
   if (!Array.isArray(rawList)) return [];
 
   return rawList

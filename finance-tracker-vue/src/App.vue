@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { TRANSACTION_TYPES } from "./domain/transactionTypes";
-import { CATEGORIES } from "./domain/categories";
+import { useCategoriesCatalog } from "./composables/useCategoriesCatalog";
 
 import SummaryCards from "./components/SummaryCards.vue";
 import TransactionForm from "./components/TransactionForm.vue";
@@ -19,20 +19,17 @@ import {
 /* ======================================================
  * 0) Migração/normalização 
  * ====================================================== */
-function migrateTransactions(raw) {
-  // legado: array direto
+function migrateTransactions(raw, categoriesByType) {
   if (Array.isArray(raw)) {
-    const normalized = normalizeTransactionsList(raw);
+    const normalized = normalizeTransactionsList(raw, categoriesByType);
     return { version: TRANSACTIONS_SCHEMA_VERSION, transactions: normalized };
   }
 
-  // formato novo
   if (raw && typeof raw === "object") {
-    const normalized = normalizeTransactionsList(raw.transactions);
+    const normalized = normalizeTransactionsList(raw.transactions, categoriesByType);
     return { version: TRANSACTIONS_SCHEMA_VERSION, transactions: normalized };
   }
 
-  // nada salvo
   return { version: TRANSACTIONS_SCHEMA_VERSION, transactions: [] };
 }
 
@@ -43,9 +40,16 @@ const STORAGE_KEY = "finance-tracker-transactions";
 
 // storageRaw é APENAS infra (pode vir legado: array / ou novo: {version, transactions})
 const storageRaw = useLocalStorage(STORAGE_KEY, null);
+const {
+  catalogRef,
+  categoriesByType,
+  addCategory,
+  removeCategory,
+  renameCategory,
+} = useCategoriesCatalog();
 
 // migra/normaliza uma vez ao carregar
-const migrated = migrateTransactions(storageRaw.value);
+const migrated = migrateTransactions(storageRaw.value, categoriesByType.value);
 
 // fonte de verdade do app: SEMPRE um array normalizado
 const transactions = ref(migrated.transactions);
@@ -100,18 +104,18 @@ const undoStack = ref([]); // snapshots (arrays de tx)
 const redoStack = ref([]);
 const HISTORY_LIMIT = 50;
 
-function cloneSnapshot(list) {
-  return JSON.parse(JSON.stringify(list));
+function cloneSnapshot() {
+  return JSON.parse(
+    JSON.stringify({
+      transactions: transactions.value,
+      categories: catalogRef.value, // <- o catálogo inteiro (storage)
+    })
+  );
 }
 
-function pushUndo(snapshotBeforeChange) {
-  undoStack.value.push(snapshotBeforeChange);
-
-  if (undoStack.value.length > HISTORY_LIMIT) {
-    undoStack.value.shift();
-  }
-
-  // mudança nova invalida redo
+function pushUndo(stateBeforeChange) {
+  undoStack.value.push(stateBeforeChange);
+  if (undoStack.value.length > HISTORY_LIMIT) undoStack.value.shift();
   redoStack.value = [];
 }
 
@@ -121,11 +125,13 @@ const canRedo = computed(() => redoStack.value.length > 0);
 function undo() {
   if (!canUndo.value) return;
 
-  const current = cloneSnapshot(transactions.value);
+  const current = cloneSnapshot();
   const previous = undoStack.value.pop();
 
   redoStack.value.push(current);
-  transactions.value = previous;
+
+  transactions.value = previous.transactions;
+  catalogRef.value = previous.categories;
 
   showFeedback("Desfez a última ação");
 }
@@ -133,11 +139,13 @@ function undo() {
 function redo() {
   if (!canRedo.value) return;
 
-  const current = cloneSnapshot(transactions.value);
+  const current = cloneSnapshot();
   const next = redoStack.value.pop();
 
   undoStack.value.push(current);
-  transactions.value = next;
+
+  transactions.value = next.transactions;
+  catalogRef.value = next.categories;
 
   showFeedback("Refez a última ação");
 }
@@ -202,10 +210,101 @@ const searchText = ref("");
 const sortBy = ref("date-desc");
 const removingIds = ref(new Set());
 
+const categoriesPanelOpen = useLocalStorage(
+  "finance-tracker:categories-panel-open",
+  true
+);
+
+function toggleCategoriesPanel() {
+  categoriesPanelOpen.value = !categoriesPanelOpen.value;
+}
+
+
 function clearFilters() {
   filterType.value = "all";
   searchText.value = "";
   sortBy.value = "date-desc";
+}
+
+const manageType = ref(TRANSACTION_TYPES.EXPENSE);
+const newCategoryName = ref("");
+
+const managedList = computed(() => {
+  return categoriesByType.value?.[manageType.value] ?? [];
+});
+
+function handleAddCategory() {
+  const name = newCategoryName.value.trim();
+
+  if (!name) {
+    showFeedback("Informe um nome de categoria", "error");
+    return;
+  }
+
+  const before = cloneSnapshot();
+
+  addCategory(manageType.value, name);
+
+  // garante consistência de domínio (categoria por tipo)
+  transactions.value = normalizeTransactionsList(
+    transactions.value,
+    categoriesByType.value
+  );
+
+  pushUndo(before);
+
+  newCategoryName.value = "";
+  showFeedback("Categoria adicionada");
+}
+
+function handleRemoveCategory(name) {
+  const confirmed = window.confirm(`Remover a categoria "${name}"?`);
+  if (!confirmed) return;
+
+  const before = cloneSnapshot();
+
+  removeCategory(manageType.value, name);
+
+  // remove categorias inválidas das transações
+  transactions.value = normalizeTransactionsList(
+    transactions.value,
+    categoriesByType.value
+  );
+
+  pushUndo(before);
+  showFeedback("Categoria removida");
+}
+
+function handleRenameCategory(oldName) {
+  const next = window.prompt("Novo nome da categoria:", oldName);
+  if (next == null) return;
+
+  const newName = next.trim();
+  if (!newName) {
+    showFeedback("Nome inválido", "error");
+    return;
+  }
+
+  const before = cloneSnapshot();
+
+  renameCategory(manageType.value, oldName, newName);
+
+  // atualiza transações que usavam a categoria antiga
+  transactions.value = transactions.value.map((tx) => {
+    if (tx.type === manageType.value && tx.category === oldName) {
+      return { ...tx, category: newName };
+    }
+    return tx;
+  });
+
+  // revalida no final
+  transactions.value = normalizeTransactionsList(
+    transactions.value,
+    categoriesByType.value
+  );
+
+  pushUndo(before);
+  showFeedback("Categoria renomeada");
 }
 
 /* ======================================================
@@ -213,19 +312,20 @@ function clearFilters() {
  * ====================================================== */
 function handleSubmit() {
   const wasEditing = !!editingId.value;
-  const before = cloneSnapshot(transactions.value);
+    const before = cloneSnapshot();
 
-  submitTransaction();
+    submitTransaction();
 
-  if (Object.keys(errors.value).length === 0) {
-    pushUndo(before);
+    if (Object.keys(errors.value).length === 0) {
+      pushUndo(before);
+    }
     showFeedback(
       wasEditing
         ? "Transação atualizada com sucesso"
         : "Transação adicionada com sucesso"
     );
   }
-}
+
 
 function handleEdit(tx) {
   editTx(tx);
@@ -240,7 +340,7 @@ async function handleDelete(id) {
   removingIds.value.add(id);
   await new Promise((resolve) => setTimeout(resolve, 160));
 
-  const before = cloneSnapshot(transactions.value);
+  const before = cloneSnapshot();
 
   deleteTx(id);
 
@@ -289,7 +389,7 @@ const visibleTransactions = computed(() => {
 
 const availableCategories = computed(() => {
   if (!form.value.type) return [];
-  return CATEGORIES[form.value.type] ?? [];
+  return categoriesByType.value?.[form.value.type] ?? [];
 });
 
 /* ======================================================
@@ -403,9 +503,9 @@ async function handleImportFileChange(event) {
       return;
     }
 
-    const normalized = normalizeTransactionsList(rawList);
+    const normalized = normalizeTransactionsList(rawList, categoriesByType.value);
 
-    const before = cloneSnapshot(transactions.value);
+    const before = cloneSnapshot();
 
     transactions.value = normalized;
     pushUndo(before);
@@ -505,6 +605,70 @@ async function handleImportFileChange(event) {
             :has-active-filters="hasActiveFilters"
             @clear="clearFilters"
           />
+
+<div class="panel-divider"></div>
+
+<section class="categories-manager" aria-label="Gerenciar categorias">
+  <button
+    class="categories-toggle"
+    type="button"
+    @click="toggleCategoriesPanel"
+    :aria-expanded="categoriesPanelOpen"
+  >
+    <span>Gerenciar categorias</span>
+    <span aria-hidden="true">
+      {{ categoriesPanelOpen ? "▲" : "▼" }}
+    </span>
+  </button>
+
+  <div v-show="categoriesPanelOpen">
+    <div class="field">
+      <label for="manageType">Tipo</label>
+      <select id="manageType" v-model="manageType">
+        <option :value="TRANSACTION_TYPES.INCOME">Receita</option>
+        <option :value="TRANSACTION_TYPES.EXPENSE">Despesa</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="newCategory">Nova categoria</label>
+
+      <div class="row">
+        <input
+          id="newCategory"
+          type="text"
+          v-model="newCategoryName"
+          placeholder="Ex: Transporte"
+        />
+        <button type="button" @click="handleAddCategory">Adicionar</button>
+      </div>
+    </div>
+
+    <div
+      v-if="managedList.length === 0"
+      class="ui-state"
+      role="status"
+      aria-live="polite"
+    >
+      Nenhuma categoria cadastrada para este tipo.
+    </div>
+
+    <ul v-else class="categories-list">
+      <li v-for="cat in managedList" :key="cat" class="categories-item">
+        <span>{{ cat }}</span>
+
+        <div class="actions">
+          <button type="button" @click="handleRenameCategory(cat)">
+            Renomear
+          </button>
+          <button type="button" @click="handleRemoveCategory(cat)">
+            Remover
+          </button>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>
 
           <div class="panel-divider"></div>
 
