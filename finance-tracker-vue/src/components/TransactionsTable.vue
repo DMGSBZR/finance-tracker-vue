@@ -1,9 +1,11 @@
 <script setup>
-defineProps({
+const props = defineProps({
   items: { type: Array, required: true },
+  removingIds: { type: Object, required: true }, // Set
 });
 
 const emit = defineEmits(["edit", "delete"]);
+
 </script>
 
 <template>
@@ -21,7 +23,11 @@ const emit = defineEmits(["edit", "delete"]);
       </thead>
 
       <tbody>
-        <tr v-for="tx in items" :key="tx.id">
+        <tr
+          v-for="tx in items"
+          :key="tx.id"
+          :class="{ 'is-removing': props.removingIds.has(tx.id) }"
+        >
           <td>{{ tx.date }}</td>
           <td>{{ tx.type === "income" ? "Receita" : "Despesa" }}</td>
           <td>{{ tx.category }}</td>

@@ -61,13 +61,24 @@ function handleEdit(tx) {
   editTx(tx);
 }
 
-function handleDelete(id) {
+async function handleDelete(id) {
   const confirmed = window.confirm(
     "Tem certeza que deseja excluir esta transação?"
   );
   if (!confirmed) return;
 
+  // Marca como removendo (ativa animação CSS)
+  removingIds.value.add(id);
+
+  // Espera a animação (0.15s = seu CSS)
+  await new Promise((resolve) => setTimeout(resolve, 160));
+
+  // Remove de fato
   deleteTx(id);
+
+  // Limpa estado
+  removingIds.value.delete(id);
+
   showFeedback("Transação removida com sucesso");
 }
 
@@ -78,6 +89,7 @@ function handleDelete(id) {
 const filterType = ref("all");
 const searchText = ref("");
 const sortBy = ref("date-desc");
+const removingIds = ref(new Set());
 
 /* ======================================================
  * 3) Derivados (lista visível)
@@ -242,10 +254,11 @@ function clearFilters() {
 
       <div v-else class="table-wrap">
         <TransactionsTable
-          :items="visibleTransactions"
-          @edit="handleEdit"
-          @delete="handleDelete"
-        />
+  :items="visibleTransactions"
+  :removing-ids="removingIds"
+  @edit="handleEdit"
+  @delete="handleDelete"
+/>
       </div>
     </section>
   </div>
