@@ -16,7 +16,8 @@ const amountInputRef = ref(null);
 const updateField = (key, value) => {
   emit("update:modelValue", { ...props.modelValue, [key]: value });
 };
- // Quando muda o tipo, a categoria anterior pode ficar inválida
+
+// Quando muda o tipo, a categoria anterior pode ficar inválida
 watch(
   () => props.modelValue.type,
   () => {
@@ -44,6 +45,7 @@ const submitLabel = computed(() => (props.isEditing ? "Salvar" : "Adicionar"));
     <div id="feedback" class="feedback" aria-live="polite" aria-atomic="true"></div>
 
     <form @submit.prevent="emit('submit')">
+      <!-- Tipo -->
       <div class="field">
         <label for="type">Tipo</label>
 
@@ -60,30 +62,51 @@ const submitLabel = computed(() => (props.isEditing ? "Salvar" : "Adicionar"));
         <small v-if="errors.type" class="field-error">{{ errors.type }}</small>
       </div>
 
+      <!-- Categoria -->
       <div class="field">
-  <label for="category">Categoria</label>
+        <label for="category">Categoria</label>
 
-  <select
-    id="category"
-    :value="modelValue.category"
-    @change="updateField('category', $event.target.value)"
-    :disabled="props.categories.length === 0"
-  >
-    <option value="">Selecione uma categoria</option>
+        <select
+          id="category"
+          :value="modelValue.category"
+          @change="updateField('category', $event.target.value)"
+          :disabled="props.categories.length === 0"
+        >
+          <option value="">Selecione uma categoria</option>
 
-    <option
-      v-for="category in props.categories"
-      :key="category"
-      :value="category"
-    >
-      {{ category }}
-    </option>
-  </select>
+          <option
+            v-for="category in props.categories"
+            :key="category"
+            :value="category"
+          >
+            {{ category }}
+          </option>
+        </select>
 
-       <small v-if="errors.category" class="field-error">{{ errors.category }}</small>
+        <small v-if="errors.category" class="field-error">
+          {{ errors.category }}
+        </small>
+      </div>
+
+      <!-- Valor -->
+      <div class="field">
+        <label for="amount">Valor</label>
+
+        <input
+          id="amount"
+          ref="amountInputRef"
+          type="number"
+          inputmode="decimal"
+          step="0.01"
+          min="0"
+          :value="modelValue.amount"
+          @input="updateField('amount', $event.target.value)"
+        />
+
         <small v-if="errors.amount" class="field-error">{{ errors.amount }}</small>
       </div>
 
+      <!-- Data -->
       <div class="field">
         <label for="date">Data</label>
 
@@ -97,19 +120,7 @@ const submitLabel = computed(() => (props.isEditing ? "Salvar" : "Adicionar"));
         <small v-if="errors.date" class="field-error">{{ errors.date }}</small>
       </div>
 
-      <div class="field">
-        <label for="category">Categoria</label>
-
-        <input
-          id="category"
-          type="text"
-          :value="modelValue.category"
-          @input="updateField('category', $event.target.value)"
-        />
-
-        <small v-if="errors.category" class="field-error">{{ errors.category }}</small>
-      </div>
-
+      <!-- Descrição -->
       <div class="field">
         <label for="description">Descrição</label>
 

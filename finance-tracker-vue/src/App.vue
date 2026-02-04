@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { TRANSACTION_TYPES } from "./domain/transactionTypes";
 import { CATEGORIES } from "./domain/categories";
 
@@ -11,11 +11,94 @@ import TransactionsTable from "./components/TransactionsTable.vue";
 import { useLocalStorage } from "./composables/useLocalStorage";
 import { useTransactions } from "./composables/useTransactions";
 
+import {
+  normalizeTransactionsList,
+  TRANSACTIONS_SCHEMA_VERSION,
+} from "./domain/normalizeTransactions";
+
+function migrateTransactions(raw) {
+  // legado: array direto
+  if (Array.isArray(raw)) {
+    const normalized = normalizeTransactionsList(raw);
+
+    return {
+      version: TRANSACTIONS_SCHEMA_VERSION,
+      transactions: normalized,
+    };
+  }
+
+  // formato novo
+  if (raw && typeof raw === "object") {
+    const normalized = normalizeTransactionsList(raw.transactions);
+
+    return {
+      version: TRANSACTIONS_SCHEMA_VERSION,
+      transactions: normalized,
+    };
+  }
+
+  // nada salvo
+  return {
+    version: TRANSACTIONS_SCHEMA_VERSION,
+    transactions: [],
+  };
+}
+
 /* ======================================================
  * 1) Fonte de verdade + composables
  * ====================================================== */
+
 const STORAGE_KEY = "finance-tracker-transactions";
-const transactions = useLocalStorage(STORAGE_KEY, []);
+
+/**
+ * storageRaw é APENAS infra (pode vir legado: array / ou novo: {version, transactions})
+ * default null para conseguirmos distinguir "não existe" vs "array vazio".
+ */
+const storageRaw = useLocalStorage(STORAGE_KEY, null);
+
+/**
+ * Migra/normaliza uma vez ao carregar.
+ * migrated = { version, transactions }
+ */
+const migrated = migrateTransactions(storageRaw.value);
+
+/**
+ * Fonte de verdade do app: SEMPRE um array normalizado.
+ */
+const transactions = ref(migrated.transactions);
+
+/**
+ * Persistimos imediatamente já no schema novo (versionado),
+ * para não precisar migrar toda vez.
+ */
+const rawBefore = storageRaw.value;
+const needsRewrite =
+  Array.isArray(rawBefore) ||
+  rawBefore == null ||
+  (rawBefore && typeof rawBefore === "object" &&
+    Number(rawBefore.version) !== TRANSACTIONS_SCHEMA_VERSION);
+
+if (needsRewrite) {
+  storageRaw.value = {
+    version: TRANSACTIONS_SCHEMA_VERSION,
+    transactions: transactions.value,
+  };
+}
+
+/**
+ * Mantém persistência reativa no schema novo.
+ */
+
+watch(
+  transactions,
+  (list) => {
+    storageRaw.value = {
+      version: TRANSACTIONS_SCHEMA_VERSION,
+      transactions: list,
+    };
+  },
+  { deep: true }
+);
 
 const {
   form,
