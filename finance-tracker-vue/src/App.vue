@@ -70,6 +70,7 @@ if (needsRewrite) {
   };
 }
 
+
 // mantém persistência reativa no schema novo
 watch(
   transactions,
@@ -228,6 +229,7 @@ function clearFilters() {
 
 const manageType = ref(TRANSACTION_TYPES.EXPENSE);
 const newCategoryName = ref("");
+const newCategoryColor = ref("#64748b");
 
 const managedList = computed(() => {
   return categoriesByType.value?.[manageType.value] ?? [];
@@ -243,7 +245,7 @@ function handleAddCategory() {
 
   const before = cloneSnapshot();
 
-  addCategory(manageType.value, name);
+  addCategory(manageType.value, name, newCategoryColor.value);
 
   // garante consistência de domínio (categoria por tipo)
   transactions.value = normalizeTransactionsList(
@@ -254,6 +256,8 @@ function handleAddCategory() {
   pushUndo(before);
 
   newCategoryName.value = "";
+  newCategoryColor.value = "#64748b";
+
   showFeedback("Categoria adicionada");
 }
 
@@ -532,6 +536,30 @@ async function handleImportFileChange(event) {
     showFeedback("Falha ao importar: JSON inválido", "error");
   }
 }
+
+const categoryColorMap = computed(() => {
+  const map = {
+    income: {},
+    expense: {},
+  };
+
+  const cat = categoriesByType.value ?? {};
+  for (const type of Object.keys(map)) {
+    const list = Array.isArray(cat[type]) ? cat[type] : [];
+    for (const item of list) {
+      if (!item?.name) continue;
+      map[type][item.name] = item.color || "#64748b";
+    }
+  }
+
+  return map;
+});
+
+function getCategoryColor(type, categoryName) {
+  if (!type || !categoryName) return "transparent";
+  return categoryColorMap.value?.[type]?.[categoryName] ?? "#64748b";
+}
+
 </script>
 
 <template>
@@ -649,14 +677,22 @@ async function handleImportFileChange(event) {
       <label for="newCategory">Nova categoria</label>
 
       <div class="row">
-        <input
-          id="newCategory"
-          type="text"
-          v-model="newCategoryName"
-          placeholder="Ex: Transporte"
-        />
-        <button type="button" @click="handleAddCategory">Adicionar</button>
-      </div>
+  <input
+    id="newCategory"
+    type="text"
+    v-model="newCategoryName"
+    placeholder="Ex: Transporte"
+  />
+
+  <input
+    type="color"
+    v-model="newCategoryColor"
+    aria-label="Cor da categoria"
+    title="Cor da categoria"
+  />
+
+  <button type="button" @click="handleAddCategory">Adicionar</button>
+</div>
     </div>
 
     <div
@@ -669,19 +705,27 @@ async function handleImportFileChange(event) {
     </div>
 
     <ul v-else class="categories-list">
-      <li v-for="cat in managedList" :key="cat" class="categories-item">
-        <span>{{ cat }}</span>
+  <li v-for="cat in managedList" :key="cat.name" class="categories-item">
+    <span class="category-badge">
+      <span
+        class="category-dot"
+        :style="{ backgroundColor: cat.color || '#64748b' }"
+        aria-hidden="true"
+      ></span>
 
-        <div class="actions">
-          <button type="button" @click="handleRenameCategory(cat)">
-            Renomear
-          </button>
-          <button type="button" @click="handleRemoveCategory(cat)">
-            Remover
-          </button>
-        </div>
-      </li>
-    </ul>
+      <span>{{ cat.name }}</span>
+    </span>
+
+    <div class="actions">
+      <button type="button" @click="handleRenameCategory(cat.name)">
+        Renomear
+      </button>
+      <button type="button" @click="handleRemoveCategory(cat.name)">
+        Remover
+      </button>
+    </div>
+  </li>
+</ul>
   </div>
 </section>
 
@@ -709,10 +753,11 @@ async function handleImportFileChange(event) {
 
           <div v-else class="table-wrap">
             <TransactionsTable
-              :items="visibleTransactions"
-              :removing-ids="removingIds"
-              @edit="handleEdit"
-              @delete="handleDelete"
+             :items="visibleTransactions"
+             :removing-ids="removingIds"
+             :get-category-color="getCategoryColor"
+             @edit="handleEdit"
+             @delete="handleDelete"
             />
           </div>
         </section>
