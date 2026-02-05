@@ -1,7 +1,11 @@
 <script setup>
 const props = defineProps({
   items: { type: Array, required: true },
-  removingIds: { type: Object, required: true }, // Set
+  removingIds: {
+  type: Object,
+  required: true,
+  validator: (v) => v instanceof Set,
+},
   getCategoryColor: { type: Function, required: true },
 });
 
@@ -36,7 +40,7 @@ const emit = defineEmits(["edit", "delete"]);
     <span
       v-if="tx.category"
       class="category-dot"
-      :style="{ backgroundColor: props.getCategoryColor(tx.type, tx.category) }"
+      :style="{ backgroundColor: getCategoryColor(tx.type, tx.category) }"
       aria-hidden="true"
     ></span>
 
