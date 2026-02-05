@@ -90,3 +90,60 @@ describe("normalizeTransactionsList", () => {
     expect(out[0].description).toBe("teste");
   });
 });
+
+it("accepts category names from object-based catalog", () => {
+  const catalog = {
+    income: [{ name: "Salário", color: "#000000" }],
+    expense: [{ name: "Alimentação", color: "#ffffff" }],
+  };
+
+  const out = normalizeTransactionsList(
+    [{ type: "income", category: "Salário", amount: 100 }],
+    catalog
+  );
+
+  expect(out[0].category).toBe("Salário");
+});
+
+it("clears category if not present in catalog", () => {
+  const catalog = {
+    income: [{ name: "Salário", color: "#000" }],
+    expense: [],
+  };
+
+  const out = normalizeTransactionsList(
+    [{ type: "income", category: "Inexistente" }],
+    catalog
+  );
+
+  expect(out[0].category).toBe("");
+});
+
+it("returns empty list for invalid input", () => {
+  expect(normalizeTransactionsList(null)).toEqual([]);
+  expect(normalizeTransactionsList(undefined)).toEqual([]);
+  expect(normalizeTransactionsList({})).toEqual([]);
+});
+
+it("always generates an id if missing", () => {
+  const out = normalizeTransactionsList([{ type: "income" }]);
+  expect(out[0].id).toBeTruthy();
+});
+
+it("snapshot cloning is deep (no shared references)", () => {
+  const original = {
+    transactions: [{ id: "1", amount: 10 }],
+    categories: {
+      income: [{ name: "Salário", color: "#000" }],
+      expense: [],
+    },
+  };
+
+  const clone = JSON.parse(JSON.stringify(original));
+
+  clone.transactions[0].amount = 999;
+  clone.categories.income[0].name = "Outro";
+
+  expect(original.transactions[0].amount).toBe(10);
+  expect(original.categories.income[0].name).toBe("Salário");
+});
