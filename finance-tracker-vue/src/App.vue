@@ -184,6 +184,12 @@ function onKeyDown(e) {
 
 onMounted(() => {
   window.addEventListener("keydown", onKeyDown);
+
+  // A11y: foco inicial no primeiro campo do formulário
+  nextTick(() => {
+    const el = document.querySelector("form select, form input");
+    el?.focus();
+  });
 });
 
 onBeforeUnmount(() => {
@@ -674,14 +680,13 @@ function startFirstTransaction() {
 
     <main class="container">
       <div
-        v-if="feedbackMessage"
-        class="feedback"
-        :class="`feedback--${feedbackType}`"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-
-      >
+  v-if="feedbackMessage"
+  class="feedback"
+  :class="`feedback--${feedbackType}`"
+  role="status"
+  :aria-live="feedbackType === 'error' ? 'assertive' : 'polite'"
+  aria-atomic="true"
+>
         {{ feedbackMessage }}
       </div>
 
