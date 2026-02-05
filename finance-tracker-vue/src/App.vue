@@ -325,6 +325,35 @@ function handleRenameCategory(oldName) {
   showFeedback("Categoria renomeada");
 }
 
+function handleChangeCategoryColor(cat) {
+  const current = cat.color || "#64748b";
+
+  const next = window.prompt(
+    "Informe a nova cor (hex, ex: #22c55e):",
+    current
+  );
+
+  if (!next) return;
+
+  const color = next.trim();
+
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+    showFeedback("Cor inválida. Use o formato #RRGGBB", "error");
+    return;
+  }
+
+  const before = cloneSnapshot();
+
+  const list = categoriesByType.value[manageType.value];
+  const target = list.find((c) => c.name === cat.name);
+  if (target) {
+    target.color = color;
+  }
+
+  pushUndo(before);
+  showFeedback("Cor da categoria atualizada");
+}
+
 /* ======================================================
  * 4) Handlers de UI (com feedback + histórico)
  * ====================================================== */
@@ -717,13 +746,18 @@ function getCategoryColor(type, categoryName) {
     </span>
 
     <div class="actions">
-      <button type="button" @click="handleRenameCategory(cat.name)">
-        Renomear
-      </button>
-      <button type="button" @click="handleRemoveCategory(cat.name)">
-        Remover
-      </button>
-    </div>
+  <button type="button" @click="handleRenameCategory(cat.name)">
+    Renomear
+  </button>
+
+  <button type="button" @click="handleChangeCategoryColor(cat)">
+    Cor
+  </button>
+
+  <button type="button" @click="handleRemoveCategory(cat.name)">
+    Remover
+  </button>
+</div>
   </li>
 </ul>
   </div>
