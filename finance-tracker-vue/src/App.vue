@@ -333,7 +333,7 @@ function handleChangeCategoryColor(cat) {
     current
   );
 
-  if (!next) return;
+  if (next == null) return; // cancelou
 
   const color = next.trim();
 
@@ -346,9 +346,9 @@ function handleChangeCategoryColor(cat) {
 
   const list = categoriesByType.value[manageType.value];
   const target = list.find((c) => c.name === cat.name);
-  if (target) {
+  if (!target) return;
     target.color = color;
-  }
+  
 
   pushUndo(before);
   showFeedback("Cor da categoria atualizada");
@@ -656,6 +656,7 @@ function getCategoryColor(type, categoryName) {
             :errors="errors"
             :is-editing="!!editingId"
             :categories="availableCategories"
+            :get-category-color="getCategoryColor"
             @submit="handleSubmit"
             @cancel="cancelEdit"
           />

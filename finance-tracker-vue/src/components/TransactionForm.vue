@@ -6,6 +6,7 @@ const props = defineProps({
   errors: { type: Object, required: true },
   isEditing: { type: Boolean, required: true },
   categories: { type: Array, required: true },
+  getCategoryColor: { type: Function, required: true },
 });
 
 const emit = defineEmits(["update:modelValue", "submit", "cancel"]);
@@ -65,6 +66,15 @@ const submitLabel = computed(() => (props.isEditing ? "Salvar" : "Adicionar"));
       <!-- Categoria -->
       <div class="field">
         <label for="category">Categoria</label>
+
+        <div class="category-preview" v-if="modelValue.category">
+  <span
+    class="category-dot"
+    :style="{ backgroundColor: getCategoryColor(modelValue.type, modelValue.category) }"
+    aria-hidden="true"
+  ></span>
+  <span>{{ modelValue.category }}</span>
+</div>
 
         <select
           id="category"
