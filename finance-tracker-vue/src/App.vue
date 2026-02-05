@@ -405,6 +405,25 @@ async function handleDelete(id) {
   showFeedback("Transação removida com sucesso");
 }
 
+function handleUpdateTransaction(updatedTx) {
+  const before = cloneSnapshot();
+
+  const idx = transactions.value.findIndex((t) => t.id === updatedTx.id);
+  if (idx === -1) return;
+
+  // aplica mudança
+  transactions.value[idx] = updatedTx;
+
+  // domínio soberano: revalida tudo
+  transactions.value = normalizeTransactionsList(
+    transactions.value,
+    categoriesByType.value
+  );
+
+  pushUndo(before);
+  showFeedback("Categoria atualizada com sucesso");
+}
+
 /* ======================================================
  * 5) Derivados (lista visível + categorias)
  * ====================================================== */
@@ -651,7 +670,7 @@ function getCategoryColor(type, categoryName) {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        
+
       >
         {{ feedbackMessage }}
       </div>
@@ -781,31 +800,60 @@ function getCategoryColor(type, categoryName) {
           <h2 class="panel-title">Transações</h2>
 
           <div
-            v-if="!hasTransactions"
-            class="ui-state"
-            role="status"
-            aria-live="polite"
-          >
-            Nenhuma transação cadastrada. Adicione sua primeira receita ou despesa.
-          </div>
+  v-if="!hasTransactions"
+  class="ui-state"
+  role="status"
+  aria-live="polite"
+>
+  <p class="ui-state__title">Nenhuma transação cadastrada</p>
 
+  <p class="ui-state__text">
+    Você ainda não adicionou receitas ou despesas.
+  </p>
+
+  <div class="ui-state__actions">
+    <button
+      type="button"
+      class="btn btn-primary"
+      @click="() => form.type || (form.type = TRANSACTION_TYPES.EXPENSE)"
+    >
+      Adicionar primeira transação
+    </button>
+  </div>
+</div>
           <div
-            v-else-if="!hasVisibleTransactions"
-            class="ui-state"
-            role="status"
-            aria-live="polite"
-          >
-            Nenhum resultado encontrado com os filtros/busca atuais.
-          </div>
+  v-else-if="!hasVisibleTransactions"
+  class="ui-state"
+  role="status"
+  aria-live="polite"
+>
+  <p class="ui-state__title">Nenhum resultado encontrado</p>
+
+  <p class="ui-state__text">
+    Os filtros ou a busca atuais não retornaram nenhuma transação.
+  </p>
+
+  <div class="ui-state__actions">
+    <button
+      type="button"
+      class="btn btn-secondary"
+      @click="clearFilters"
+    >
+      Limpar filtros
+    </button>
+  </div>
+</div>
 
           <div v-else class="table-wrap">
             <TransactionsTable
-             :items="visibleTransactions"
-             :removing-ids="removingIds"
-             :get-category-color="getCategoryColor"
-             @edit="handleEdit"
-             @delete="handleDelete"
-            />
+  :items="visibleTransactions"
+  :removing-ids="removingIds"
+  :get-category-color="getCategoryColor"
+  :categories-by-type="categoriesByType"
+  @edit="handleEdit"
+  @delete="handleDelete"
+  @update="handleUpdateTransaction"
+/>
           </div>
         </section>
       </div>

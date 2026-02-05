@@ -25,15 +25,24 @@ if (t === "EXPENSE") return TRANSACTION_TYPES.EXPENSE;
   return TRANSACTION_TYPES.EXPENSE;
 }
 
-/**
- * Garante categoria coerente com o tipo.
- * Se inválida, retorna "" (para forçar o usuário escolher) ou uma default.
- * Aqui vamos retornar "" para não mascarar dado errado.
- */
-function normalizeCategory(type, rawCategory) {
-  const allowed = categoriesByType?.[type] ?? [];
+function categoryNames(list) {
+  if (!Array.isArray(list)) return [];
+
+  return list
+    .map((c) => {
+      if (typeof c === "string") return c;
+      if (c && typeof c === "object" && c.name) return String(c.name);
+      return "";
+    })
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function normalizeCategory(type, rawCategory, categoriesByType) {
+  const allowed = categoryNames(categoriesByType?.[type]);
+
   if (!rawCategory) return "";
-  return allowed.includes(rawCategory) ? rawCategory : "";
+  return allowed.includes(String(rawCategory).trim()) ? String(rawCategory).trim() : "";
 }
 
 function normalizeAmount(rawAmount) {
@@ -76,34 +85,26 @@ function ensureId(rawId) {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function normalizeOne(raw) {
+function normalizeOne(raw, categoriesByType) {
   const type = normalizeType(raw?.type);
 
   return {
     id: ensureId(raw?.id),
     type,
-    category: normalizeCategory(type, raw?.category),
+    category: normalizeCategory(type, raw?.category, categoriesByType),
     amount: normalizeAmount(raw?.amount),
     date: normalizeDate(raw?.date),
     description: normalizeDescription(raw?.description),
   };
 }
 
-/**
- * Normaliza uma lista inteira.
- * - Remove itens inválidos (não-objeto)
- * - Normaliza campos
- */
 export function normalizeTransactionsList(rawList, categoriesByType = CATEGORIES) {
   if (!Array.isArray(rawList)) return [];
 
   return rawList
     .filter((x) => x && typeof x === "object")
-    .map(normalizeOne);
+    .map((raw) => normalizeOne(raw, categoriesByType));
 }
 
-/**
- * Uma “assinatura” simples de schema.
- * Usamos para marcar dados já migrados.
- */
+
 export const TRANSACTIONS_SCHEMA_VERSION = 1;
