@@ -403,7 +403,8 @@ const visibleTransactions = computed(() => {
 
 const availableCategories = computed(() => {
   if (!form.value.type) return [];
-  return categoriesByType.value?.[form.value.type] ?? [];
+  const list = categoriesByType.value?.[form.value.type] ?? [];
+  return list.map((c) => c.name);
 });
 
 /* ======================================================
