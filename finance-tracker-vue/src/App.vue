@@ -615,6 +615,16 @@ function getCategoryColor(type, categoryName) {
   if (!type || !categoryName) return "transparent";
   return categoryColorMap.value?.[type]?.[categoryName] ?? "#64748b";
 }
+function startFirstTransaction() {
+  if (!form.value.type) {
+    form.value.type = TRANSACTION_TYPES.EXPENSE;
+  }
+
+  nextTick(() => {
+    const el = document.querySelector("form select, form input");
+    el?.focus();
+  });
+}
 
 </script>
 
@@ -815,7 +825,7 @@ function getCategoryColor(type, categoryName) {
     <button
       type="button"
       class="btn btn-primary"
-      @click="() => form.type || (form.type = TRANSACTION_TYPES.EXPENSE)"
+      @click="startFirstTransaction"
     >
       Adicionar primeira transação
     </button>
