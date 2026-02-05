@@ -339,3 +339,10 @@ tbody tr:nth-child(even) {
   border-radius: 999px;
   flex: 0 0 auto;
 }
+.categories-toggle:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}

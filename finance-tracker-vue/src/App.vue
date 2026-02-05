@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { TRANSACTION_TYPES } from "./domain/transactionTypes";
 import { useCategoriesCatalog } from "./composables/useCategoriesCatalog";
 
@@ -219,6 +219,14 @@ const categoriesPanelOpen = useLocalStorage(
 function toggleCategoriesPanel() {
   categoriesPanelOpen.value = !categoriesPanelOpen.value;
 }
+
+const newCategoryInputRef = ref(null);
+
+watch(categoriesPanelOpen, async (open) => {
+  if (!open) return;
+  await nextTick();
+  newCategoryInputRef.value?.focus();
+});
 
 
 function clearFilters() {
@@ -642,6 +650,8 @@ function getCategoryColor(type, categoryName) {
         :class="`feedback--${feedbackType}`"
         role="status"
         aria-live="polite"
+        aria-atomic="true"
+        
       >
         {{ feedbackMessage }}
       </div>
@@ -683,18 +693,19 @@ function getCategoryColor(type, categoryName) {
 
 <section class="categories-manager" aria-label="Gerenciar categorias">
   <button
-    class="categories-toggle"
-    type="button"
-    @click="toggleCategoriesPanel"
-    :aria-expanded="categoriesPanelOpen"
-  >
+  class="categories-toggle"
+  type="button"
+  @click="toggleCategoriesPanel"
+  :aria-expanded="categoriesPanelOpen"
+  aria-controls="categories-panel"
+>
     <span>Gerenciar categorias</span>
     <span aria-hidden="true">
       {{ categoriesPanelOpen ? "▲" : "▼" }}
     </span>
   </button>
 
-  <div v-show="categoriesPanelOpen">
+  <div id="categories-panel" v-show="categoriesPanelOpen">
     <div class="field">
       <label for="manageType">Tipo</label>
       <select id="manageType" v-model="manageType">
@@ -708,11 +719,12 @@ function getCategoryColor(type, categoryName) {
 
       <div class="row">
   <input
-    id="newCategory"
-    type="text"
-    v-model="newCategoryName"
-    placeholder="Ex: Transporte"
-  />
+  ref="newCategoryInputRef"
+  id="newCategory"
+  type="text"
+  v-model="newCategoryName"
+  placeholder="Ex: Transporte"
+/>
 
   <input
     type="color"
