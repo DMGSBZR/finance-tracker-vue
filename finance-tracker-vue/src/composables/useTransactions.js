@@ -1,6 +1,6 @@
 import { ref } from "vue";
-import { TRANSACTION_TYPES } from "../domain/transactionTypes";
-import { CATEGORIES } from "../domain/categories";
+import { TRANSACTION_TYPES } from "../core/domain/transactionTypes";
+import { CATEGORIES } from "../core/domain/categories";
 
 function isValidCategory(type, category) {
   if (!type || !category) return false;

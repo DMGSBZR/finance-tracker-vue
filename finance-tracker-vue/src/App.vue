@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
-import { TRANSACTION_TYPES } from "./domain/transactionTypes";
+import { TRANSACTION_TYPES } from "./core/domain/transactionTypes";
 import { useCategoriesCatalog } from "./composables/useCategoriesCatalog";
 
 import SummaryCards from "./components/SummaryCards.vue";
@@ -14,7 +14,7 @@ import { useTransactions } from "./composables/useTransactions";
 import {
   normalizeTransactionsList,
   TRANSACTIONS_SCHEMA_VERSION,
-} from "./domain/normalizeTransactions";
+} from "./core/domain/normalizeTransactions";
 
 /* ======================================================
  * 0) Migração/normalização 

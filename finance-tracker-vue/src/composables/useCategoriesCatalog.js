@@ -1,7 +1,7 @@
 import { computed } from "vue";
 import { useLocalStorage } from "./useLocalStorage";
-import { TRANSACTION_TYPES } from "../domain/transactionTypes";
-import { CATEGORIES as DEFAULT_CATEGORIES } from "../domain/categories";
+import { TRANSACTION_TYPES } from "../core/domain/transactionTypes";
+import { CATEGORIES as DEFAULT_CATEGORIES } from "../core/domain/categories";
 
 const CATEGORIES_SCHEMA_VERSION = 1;
 const STORAGE_KEY = "finance-tracker-categories";
