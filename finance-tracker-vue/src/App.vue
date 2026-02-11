@@ -8,6 +8,9 @@ import TransactionForm from "./components/TransactionForm.vue";
 import FiltersBar from "./components/FiltersBar.vue";
 import TransactionsTable from "./components/TransactionsTable.vue";
 
+import { applyTransactionUpdate } from "./core/useCases/applyTransactionUpdate";
+import { revalidateTransactions } from "./core/useCases/revalidateTransactions";
+
 import { useLocalStorage } from "./composables/useLocalStorage";
 import { useTransactions } from "./composables/useTransactions";
 
@@ -15,6 +18,7 @@ import {
   normalizeTransactionsList,
   TRANSACTIONS_SCHEMA_VERSION,
 } from "./core/domain/normalizeTransactions";
+
 
 /* ======================================================
  * 0) Migração/normalização 
@@ -262,10 +266,10 @@ function handleAddCategory() {
   addCategory(manageType.value, name, newCategoryColor.value);
 
   // garante consistência de domínio (categoria por tipo)
-  transactions.value = normalizeTransactionsList(
-    transactions.value,
-    categoriesByType.value
-  );
+  transactions.value = revalidateTransactions(
+  transactions.value,
+  categoriesByType.value
+);
 
   pushUndo(before);
 
@@ -298,10 +302,10 @@ function handleRemoveCategory(name) {
 
   removeCategory(type, name);
 
-  transactions.value = normalizeTransactionsList(
-    transactions.value,
-    categoriesByType.value
-  );
+  transactions.value = revalidateTransactions(
+  transactions.value,
+  categoriesByType.value
+);
 
   pushUndo(before);
   showFeedback("Categoria removida");
@@ -330,10 +334,10 @@ function handleRenameCategory(oldName) {
   });
 
   // revalida no final
-  transactions.value = normalizeTransactionsList(
-    transactions.value,
-    categoriesByType.value
-  );
+  transactions.value = revalidateTransactions(
+  transactions.value,
+  categoriesByType.value
+);
 
   pushUndo(before);
   showFeedback("Categoria renomeada");
@@ -414,15 +418,9 @@ async function handleDelete(id) {
 function handleUpdateTransaction(updatedTx) {
   const before = cloneSnapshot();
 
-  const idx = transactions.value.findIndex((t) => t.id === updatedTx.id);
-  if (idx === -1) return;
-
-  // aplica mudança
-  transactions.value[idx] = updatedTx;
-
-  // domínio soberano: revalida tudo
-  transactions.value = normalizeTransactionsList(
+  transactions.value = applyTransactionUpdate(
     transactions.value,
+    updatedTx,
     categoriesByType.value
   );
 
